@@ -15,7 +15,7 @@ class Env(object):
     """
 
     # Root of the git repository (edx-platform)
-    #REPO_ROOT = path(__file__).dirname().dirname().dirname()
+    #REPO_ROOT = path(__file__).dirname().dirname().dirname() - yields null
     REPO_ROOT = path(os.path.dirname(os.path.abspath(__file__))).dirname().dirname()
 
     # Service variant (lms, cms, etc.) configured with an environment variable
@@ -34,11 +34,7 @@ class Env(object):
         if self.SERVICE_VARIANT is not None:
             env_path = self.REPO_ROOT.dirname() / "{service}.env.json".format(service=self.SERVICE_VARIANT)
 
-        # If the file does not exist, issue a warning and return an empty dict
-        print ("Repo root is = " + self.REPO_ROOT.dirname())
-        print ("Directory of the file is = " + path(__file__).dirname().dirname())
-        print ("Project root is : " + path(os.path.dirname(os.path.abspath(__file__))).dirname().dirname())
-        print ( "Service variant is:" + self.SERVICE_VARIANT + " path is :"+ env_path)
+        # If the file does not exist, issue a warning and return an empty dict 
         if not os.path.isfile(env_path):
             print(
                 "Warning: could not find environment JSON file "
