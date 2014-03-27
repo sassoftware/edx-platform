@@ -35,6 +35,7 @@ class Env(object):
 
         # If the file does not exist, issue a warning and return an empty dict
         print ("Repo root is = " + self.REPO_ROOT.dirname())
+        print ("Path of the file is = " + path(__file__))
         print ( "Service variant is:" + self.SERVICE_VARIANT + " path is :"+ env_path)
         if not os.path.isfile(env_path):
             print(
