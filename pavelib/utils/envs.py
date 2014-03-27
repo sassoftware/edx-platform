@@ -43,6 +43,7 @@ class Env(object):
             return dict()
 
         # Otherwise, load the file as JSON and return the resulting dict
+        print ( "Service variant is:" + self.SERVICE_VARIANT + " path is :"+ env_path)
         try:
             with open(env_path) as env_file:
                 return json.load(env_file)
