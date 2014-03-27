@@ -34,9 +34,9 @@ class Env(object):
             env_path = self.REPO_ROOT.dirname() / "{service}.env.json".format(service=self.SERVICE_VARIANT)
 
         # If the file does not exist, issue a warning and return an empty dict
-        print "\nself.SERVICE_VARIANT="
+        print "self.SERVICE_VARIANT="
         print self.SERVICE_VARIANT
-        print "\nenv_path="
+        print "env_path="
         print env_path
         print "**************"
         if not os.path.isfile(env_path):
