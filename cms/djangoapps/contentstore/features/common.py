@@ -318,28 +318,29 @@ def i_am_shown_a_notification(step):
     assert world.is_css_present('.wrapper-prompt')
 
 
-def type_in_codemirror(index, text, find_prefix="$"):
+def type_in_codemirror(index, text):
     script = """
-    var cm = {find_prefix}('div.CodeMirror:eq({index})').get(0).CodeMirror;
+    var cm = $('div.CodeMirror:eq({})').get(0).CodeMirror;
     cm.getInputField().focus();
     cm.setValue(arguments[0]);
-    cm.getInputField().blur();""".format(index=index, find_prefix=find_prefix)
+    cm.getInputField().blur();""".format(index)
     world.browser.driver.execute_script(script, str(text))
     world.wait_for_ajax_complete()
 
-
-def get_codemirror_value(index=0, find_prefix="$"):
-    return world.browser.driver.execute_script(
-        """
-        return {find_prefix}('div.CodeMirror:eq({index})').get(0).CodeMirror.getValue();
-        """.format(index=index, find_prefix=find_prefix)
-    )
+def get_codemirror_value(index=0):
+    return world.browser.driver.execute_script("""
+        return $('div.CodeMirror:eq({})').get(0).CodeMirror.getValue();
+        """.format(index))
 
 
-def upload_file(filename):
-    path = os.path.join(TEST_ROOT, filename)
+def attach_file(filename, sub_path):
+    path = os.path.join(TEST_ROOT, sub_path, filename)
     world.browser.execute_script("$('input.file-input').css('display', 'block')")
     world.browser.attach_file('file', os.path.abspath(path))
+
+
+def upload_file(filename, sub_path=''):
+    attach_file(filename, sub_path)
     button_css = '.upload-dialog .action-upload'
     world.css_click(button_css)
 
