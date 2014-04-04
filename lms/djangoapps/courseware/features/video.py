@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=C0111
 
-from lettuce import world, step, before
+from lettuce import world, step, before, after
 import json
 import os
 import time
 import requests
+from nose.tools import assert_less
 from common import i_am_registered_for_the_course, visit_scenario_item
 from django.utils.translation import ugettext as _
 from django.conf import settings
@@ -24,6 +25,13 @@ HTML5_SOURCES = [
     'https://s3.amazonaws.com/edx-course-videos/edx-intro/edX-FA12-cware-1_100.webm',
     'https://s3.amazonaws.com/edx-course-videos/edx-intro/edX-FA12-cware-1_100.ogv',
 ]
+
+FLASH_SOURCES = {
+    'youtube_id_1_0': 'OEoXaMPEzfM',
+    'youtube_id_0_75': 'JMD_ifUUfsU',
+    'youtube_id_1_25': 'AKqURZnYqpk',
+    'youtube_id_1_5': 'DYpADpL7jAY',
+}
 
 HTML5_SOURCES_INCORRECT = [
     'https://s3.amazonaws.com/edx-course-videos/edx-intro/edX-FA12-cware-1_100.mp99',
@@ -49,6 +57,11 @@ coursenum = 'test_course'
 @before.each_scenario
 def setUp(scenario):
     world.video_sequences = {}
+
+
+@after.each_scenario
+def tearDown(scenario):
+    world.browser.cookies.delete('edX_video_player_mode')
 
 
 class RequestHandlerWithSessionId(object):
@@ -97,19 +110,6 @@ def get_metadata(parent_location, player_mode, data, display_name='Video'):
         'metadata': {},
     }
 
-    if data:
-        conversions = {
-            'transcripts': json.loads,
-            'download_track': json.loads,
-            'download_video': json.loads,
-        }
-
-        for key in data:
-            if key in conversions:
-                data[key] = conversions[key](data[key])
-
-        kwargs['metadata'].update(data)
-
     if player_mode == 'html5':
         kwargs['metadata'].update({
             'youtube_id_1_0': '',
@@ -135,6 +135,23 @@ def get_metadata(parent_location, player_mode, data, display_name='Video'):
             'html5_sources': HTML5_SOURCES_INCORRECT
         })
 
+    if player_mode == 'flash':
+        kwargs['metadata'].update(FLASH_SOURCES)
+        world.browser.cookies.add({'edX_video_player_mode': 'flash'})
+
+    if data:
+        conversions = {
+            'transcripts': json.loads,
+            'download_track': json.loads,
+            'download_video': json.loads,
+        }
+
+        for key in data:
+            if key in conversions:
+                data[key] = conversions[key](data[key])
+
+        kwargs['metadata'].update(data)
+
     return kwargs
 
 
@@ -159,6 +176,9 @@ def add_videos_to_course(course, player_mode=None, display_names=None, hashes=No
 
 
 def add_video_to_course(course, parent_location=None, player_mode=None, data=None, display_name='Video'):
+
+    assert_less(world.youtube.config['youtube_api_response'].status_code, 400, "Real Youtube server is unavailable")
+
     if not parent_location:
         parent_location = add_vertical_to_course(course)
     kwargs = get_metadata(parent_location, player_mode, data, display_name=display_name)
@@ -247,6 +267,14 @@ def duration():
     return duration
 
 
+def elapsed_time():
+    """
+    Elapsed time of the video, in seconds.
+    """
+    elapsed_time, duration = video_time()
+    return elapsed_time
+
+
 def video_time():
     """
     Return a tuple `(elapsed_time, duration)`, each in seconds.
@@ -267,6 +295,11 @@ def parse_time_str(time_str):
     """
     time_obj = time.strptime(time_str, '%M:%S')
     return time_obj.tm_min * 60 + time_obj.tm_sec
+
+
+def find_caption_line_by_data_index(index):
+    SELECTOR = ".subtitles > li[data-index='{index}']".format(index=index)
+    return world.css_find(SELECTOR).first
 
 
 @step('youtube stub server (.*) YouTube API')
@@ -345,7 +378,8 @@ def set_youtube_response_timeout(_step, time):
 def video_is_rendered(_step, mode):
     modes = {
         'html5': 'video',
-        'youtube': 'iframe'
+        'youtube': 'iframe',
+        'flash': 'iframe',
     }
     html_tag = modes[mode.lower()]
     assert world.css_find('.video {0}'.format(html_tag)).first
@@ -356,7 +390,8 @@ def video_is_rendered(_step, mode):
 def videos_are_rendered(_step, mode):
     modes = {
         'html5': 'video',
-        'youtube': 'iframe'
+        'youtube': 'iframe',
+        'flash': 'iframe',
     }
     html_tag = modes[mode.lower()]
 
@@ -390,12 +425,12 @@ def error_message_has_correct_text(_step):
 @step('I make sure captions are (.+)$')
 def set_captions_visibility_state(_step, captions_state):
     SELECTOR = '.closed .subtitles'
-    if world.is_css_not_present(SELECTOR):
+    if world.is_css_not_present(SELECTOR, wait_time=30):
         if captions_state == 'closed':
-            world.css_find('.hide-subtitles').click()
+            world.css_click('.hide-subtitles')
     else:
         if captions_state != 'closed':
-            world.css_find('.hide-subtitles').click()
+            world.css_click('.hide-subtitles')
 
 
 @step('I see video menu "([^"]*)" with correct items$')
@@ -419,6 +454,7 @@ def i_see_menu(_step, menu):
 
 @step('I see "([^"]*)" text in the captions$')
 def check_text_in_the_captions(_step, text):
+    world.wait_for_present('.video.is-captions-rendered')
     world.wait_for(lambda _: world.css_text('.subtitles'))
     actual_text = world.css_text('.subtitles')
     assert (text in actual_text)
@@ -426,6 +462,7 @@ def check_text_in_the_captions(_step, text):
 
 @step('I see text in the captions:')
 def check_captions(_step):
+    world.wait_for_present('.video.is-captions-rendered')
     for index, video in enumerate(_step.hashes):
         assert (video.get('text') in world.css_text('.subtitles', index=index))
 
@@ -435,12 +472,12 @@ def select_language(_step, code):
     # Make sure that all ajax requests that affects the language menu are finished.
     # For example, request to get new translation etc.
     world.wait_for_ajax_complete()
-
     selector = VIDEO_MENUS["language"] + ' li[data-lang-code="{code}"]'.format(
         code=code
     )
 
     world.css_find(VIDEO_BUTTONS["CC"])[0].mouse_over()
+    world.wait_for_present('.lang.open')
     world.css_click(selector)
 
     assert world.css_has_class(selector, 'active')
@@ -450,6 +487,7 @@ def select_language(_step, code):
     # For example, request to get new translation etc.
     world.wait_for_ajax_complete()
     world.wait_for_visible('.subtitles')
+    world.wait_for_present('.video.is-captions-rendered')
 
 
 @step('I click video button "([^"]*)"$')
@@ -468,9 +506,11 @@ def start_playing_video_from_n_seconds(_step, position):
 @step('I see duration "([^"]*)"$')
 def i_see_duration(_step, position):
     world.wait_for(
-        func=lambda _: duration() == parse_time_str(position),
-        timeout=5
+        func=lambda _: duration() > 0,
+        timeout=30
     )
+
+    assert duration() == parse_time_str(position)
 
 
 @step('I seek video to "([^"]*)" seconds$')
@@ -503,14 +543,11 @@ def video_alignment(_step, transcript_visibility):
 
     set_window_dimensions(300, 600)
     real, expected = get_all_dimensions()
-
     width = round(100 * real['width']/expected['width']) == wrapper_width
 
     set_window_dimensions(600, 300)
     real, expected = get_all_dimensions()
-
     height = abs(expected['height'] - real['height']) <= 5
-
     # Restore initial window size
     set_window_dimensions(initial['width'], initial['height'])
 
@@ -539,6 +576,10 @@ def select_transcript_format(_step, format):
     menu_selector = VIDEO_MENUS['download_transcript']
 
     button = world.css_find(button_selector).first
+
+    height = button._element.location_once_scrolled_into_view['y']
+    world.browser.driver.execute_script("window.scrollTo(0, {});".format(height))
+
     button.mouse_over()
     assert world.css_has_text(button_selector, '...', strip=True)
 
@@ -548,6 +589,8 @@ def select_transcript_format(_step, format):
             item.click()
             world.wait_for_ajax_complete()
             break
+
+    world.browser.driver.execute_script("window.scrollTo(0, 0);")
 
     assert world.css_find(menu_selector + ' .active a')[0]['data-value'] == format
     assert world.css_has_text(button_selector, '.' + format, strip=True)
@@ -559,3 +602,12 @@ def shows_captions(_step, show_captions):
         assert world.is_css_present('div.video.closed')
     else:
         assert world.is_css_not_present('div.video.closed')
+
+
+@step('I click on caption line "([^"]*)", video module shows elapsed time "([^"]*)"$')
+def click_on_the_caption(_step, index, expected_time):
+    world.wait_for_present('.video.is-captions-rendered')
+    find_caption_line_by_data_index(int(index)).click()
+    actual_time = elapsed_time()
+    assert int(expected_time) == actual_time
+
