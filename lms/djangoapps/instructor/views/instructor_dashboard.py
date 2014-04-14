@@ -60,8 +60,7 @@ def instructor_dashboard_2(request, course_id):
         sections.insert(3, _section_extensions(course))
 
     # Gate access to course email by feature flag & by course-specific authorization
-    if settings.FEATURES['ENABLE_INSTRUCTOR_EMAIL'] and \
-       is_studio_course and CourseAuthorization.instructor_email_enabled(course_id):
+    if settings.FEATURES['ENABLE_INSTRUCTOR_EMAIL'] and is_studio_course and CourseAuthorization.instructor_email_enabled(course_id):
         sections.append(_section_send_email(course_id, access, course))
 
     # Gate access to Metrics tab by featue flag and staff authorization
@@ -242,6 +241,8 @@ def _section_metrics(course_id, access):
         'section_display_name': ('Metrics'),
         'access': access,
         'sub_section_display_name': get_section_display_name(course_id),
-        'section_has_problem': get_array_section_has_problem(course_id)
+        'section_has_problem': get_array_section_has_problem(course_id),
+        'get_students_opened_subsection_url': reverse('get_students_opened_subsection'),
+        'get_students_problem_grades_url': reverse('get_students_problem_grades'),
     }
     return section_data

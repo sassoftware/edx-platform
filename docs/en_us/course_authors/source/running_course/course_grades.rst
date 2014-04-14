@@ -268,7 +268,7 @@ The file includes a row for each problem-answer combination selected by your stu
 The CSV file contains the following columns:
 
 .. list-table::
-   :widths: 20 75
+   :widths: 20 65
    :header-rows: 1
 
    * - Column
@@ -296,15 +296,29 @@ Entries are sorted by the value in each column, starting with the ModuleID on th
 
 Please note the following about the student answer distribution report:   
 
-  * This report includes only problems that at least one student has answered since early March 2014. For those problems, this report only includes activity that occurred after October 2013. 
+* This report includes only problems that at least one student has answered since 6 March 2014. For those problems, this report only includes activity that occurred after October 2013. 
 
-  * For checkboxes and multiple choice problems, the answer choices actually selected by a student after early March 2014 display as described above. Answer choices selected by at least one student after October 2013, but not selected since early March 2014, are included on the report but do not include an **AnswerValue**. The **ValueID** does display the internal identifiers, such as choice_1 and choice_2, for those answers. 
+* For checkboxes and multiple choice problems, the answer choices actually selected by a student after 6 March 2014 display as described above. Answer choices selected by at least one student after October 2013, but not selected since 6 March 2014, are included on the report but do not include an **AnswerValue**. The **ValueID** does display the internal identifiers, such as choice_1 and choice_2, for those answers. 
 
-  * For problems that use the **Randomization** setting in Studio, if a particular answer has not been selected since early March 2014, the **Question** is blank for that answer.
+* For problems that use the **Randomization** setting in Studio, if a particular answer has not been selected since 6 March 2014, the **Question** is blank for that answer.
 
-  * Problem **Count** values reflect the entire problem history. If you change a problem after it is released, it may not be possible for you to determine which answers were given before and after you made the change.
+* Problem **Count** values reflect the entire problem history. If you change a problem after it is released, it may not be possible for you to determine which answers were given before and after you made the change.
 
-  * Spreadsheet applications such as Microsoft Excel can alter the data in the CSV report for display purposes. For example, for different student answers of "0.5" and ".5" Excel correctly includes two different lines, but displays the **AnswerValue** on both of them as "0.5". If you notice answers that appear to be the same on separate lines with separate counts, you can review the actual, unaltered data by opening the CSV file in a text editor.
+* Some spreadsheet applications can alter the data in the CSV report for display purposes. For example, for different student answers of "0.5" and ".5" Excel correctly includes the two different lines from the CSV, but displays the **AnswerValue** on both of them as "0.5". If you notice answers that appear to be the same on separate lines with separate counts, you can review the actual, unaltered data by opening the CSV file in a text editor.
+
+* The CSV file is UTF-8 encoded, but not all spreadsheet applications interpret and render UTF-8 encoded characters correctly. For example, a student answer distribution report with answer values in French displays differently in Microsoft Excel for Mac than in OpenOffice Calc. 
+
+  Answer Values in Microsoft Excel for Mac:
+
+   .. image:: ../Images/student_answer_excel.png
+     :alt: A spreadsheet that replaces accented French characters with underscores
+
+  Answer Values in OpenOffice Calc:
+
+   .. image:: ../Images/student_answer_calc.png
+     :alt: A spreadsheet that displays accented French characters correctly
+
+  If you notice characters that do not display as expected in a spreadsheet, try a different spreadsheet application such as LibreOffice or Apache OpenOffice to open the CSV file. (These applications are open-source office suites that are available for download online.)
 
 .. _Download_Answer_Distributions:
 
@@ -323,6 +337,30 @@ To download the most recent file of student answer data:
 #. Click **Data Download**.
 
 #. At the bottom of the page, click the ``{course_id}_answer_distribution.csv`` file name.
+
+==========================================================================
+Interpret the Student Answer Distribution Report
+==========================================================================
+
+You can use the Student Answer Distribution report to review student responses to assignments, which can then help you evaluate the structure and completeness of your courseware and problem components.
+
+As an example, you define a text input question in Studio to have a single correct answer, "Warfarin". When you produce the Student Answer Distribution report, you verify that this answer was in fact marked correct: there is a 1 in the **Correct Answer** column for this **AnswerValue**. 
+
+.. image:: ../Images/SAD_Answer_Review.png
+    :alt: In Excel, 5 rows show 5 answer values, 4 of which show comprehension of the question, but only 1 answer is marked as correct
+
+However, as you view the report you notice other student answers that you did not set up to be marked as correct in Studio, but that you might (or might not) also consider to be correct, such as "Warfarin or Coumadin". The **Correct Answer** column shows that the other answers were marked incorrect (0), but for future iterations of your course you may want to revise the question or update the problem to evaluate additional variations of the answer as correct.
+
+Many spreadsheet applications offer data visualization options, such as charts or graphs. Charts can help make your students' common misconceptions  easier to identify. 
+
+.. image:: ../Images/SAD_Column_Chart.png
+    :alt: In Excel, AnswerValue and Count columns next to each other, values for 4 rows selected, and a column chart of the count for the 4 answers
+
+In this example, the Student Answer Distribution report is open in Microsoft Excel. To create a chart that shows how many of your students chose various answers to a multiple choice question, you move the **AnswerValue** and **Count** columns next to each other. After you click and drag to select the report cells that contain the data you want to chart, you click the Charts toolbar and then click the type of chart you want.
+
+.. note:: Refer to the help for the spreadsheet application that you use for information on using these options. You may have to make changes to your spreadsheet, such as reordering columns. Save a copy of the file you originally downloaded as a backup before you begin. 
+
+You can adjust your course content based on common student mistakes. While most students in this example selected the correct answer, the number of incorrect answer(s) can guide future changes to the courseware. 
 
 ===================================================
 View a Histogram of Scores for a Single Problem
@@ -347,4 +385,4 @@ To display the distribution of scores for a problem:
    .. image:: ../Images/score_histogram.png
      :alt: Graph of the numbers of students who got different scores for a selected problem
 
-..  **Question**: (sent to Olga 31 Jan 14) this is a tough UI to use: how do they correlate the codes in this drop-down with actual constructed problems? the copy-and-paste UI on the Student Admin page actually works a little better imo.
+..  **Question**: (sent to Olga 31 Jan 14) this is a tough UI to use: how do they correlate the codes in this drop-down with actual constructed problems? the copy-and-paste UI on the Student Admin page actually works a little better imo. LMS-2522
