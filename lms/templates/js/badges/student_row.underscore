@@ -1,0 +1,6 @@
+		<tr> 
+			<td id="<%= student.name+"_link" %>"><a><%= student.email %></a></td>   
+			<td><%= student.name %></td> 
+			<td><%= student.badges %></td> 
+			<td><%= student.badgerequests %></td>
+		</tr> 
