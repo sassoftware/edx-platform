@@ -1,0 +1,9 @@
+<%! from django.utils.translation import ugettext as _ %>
+<%page args="section_data"/>
+
+
+<script language="JavaScript" type="text/javascript">
+	var enrolled_students = ${ section_data['enrolled_students'] };
+</script>
+
+<div id="enrolled_student_table"></div>
