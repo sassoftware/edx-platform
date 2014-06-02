@@ -42,7 +42,41 @@
   <script type="text/javascript" src="${static.url('js/vendor/tinymce/js/tinymce/tinymce.full.min.js')}"></script>
   <script type="text/javascript" src="${static.url('js/vendor/tinymce/js/tinymce/jquery.tinymce.min.js')}"></script>
   <%static:js group='module-descriptor-js'/>
+  <script type="text/javascript" src="${static.url('js/vendor/backbone-min.js')}"></script>  
+  ## Pattern borrowed from studio to load templates into the header.
+  % for template_name in ["student_table", "student_row"]:
+  <script type="text/template" id="${template_name}-tpl">
+    <%static:include path="js/badges/${template_name}.underscore" />
+  </script>
+  % endfor  
   <%static:js group='instructor_dash'/>
+
+  <style type="text/css">
+    table.stat_table {
+      font-family: verdana,arial,sans-serif;
+      font-size:11px;
+      color:#333333;
+      border-width: 1px;
+      border-color: #666666;
+      border-collapse: collapse;
+    }
+    table.stat_table th {
+      border-width: 1px;
+      padding: 8px;
+      border-style: solid;
+      border-color: #666666;
+      background-color: #dedede;
+    }
+    table.stat_table td {
+      border-width: 1px;
+      padding: 8px;
+      border-style: solid;
+      border-color: #666666;
+      background-color: #ffffff;
+    }
+  </style>  
+
+
 </%block>
 
 ## NOTE that instructor is set as the active page so that the instructor button lights up, even though this is the instructor_2 page.

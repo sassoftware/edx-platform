@@ -10,6 +10,27 @@
 		</tbody>
 	</table>
 	</div>
-	<div id="student_manage_badges" style="display: none;">
+	<div id="student_manage_badges" style="display: None" >
 	<h3>Managing the Badges for a Student</h3>
+	<div id="tabs" class="ui-tabs stat_table">
+  <ul>
+    <li><a href="#fragment-1" class="ui-tabs-nav">One</a></li>
+    <li class="ui-tabs-nav ui-tabs-active"><a href="#fragment-2">Two</a></li>
+    <li><a href="#fragment-3" class="ui-tabs-nav">Three</a></li>
+  </ul>
+  <div id="fragment-1" class="ui-tabs-panel">
+    Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat.
+  </div>
+  <div id="fragment-2" class="ui-tabs-panel">
+    Tab 2 Content.
+  </div>
+  <div id="fragment-3" class="ui-tabs-panel">
+    Tab 3 Content.
+  </div>
+</div>
 	</div>
+	<script> 
+		$(function() {
+	    	$( "#tabs" ).tabs();
+	  	});
+	</script>
