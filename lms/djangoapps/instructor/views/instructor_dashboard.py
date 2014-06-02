@@ -28,7 +28,7 @@ from bulk_email.models import CourseAuthorization
 from class_dashboard.dashboard_data import get_section_display_name, get_array_section_has_problem
 from user_api.serializers import UserSerializer
 from rest_framework.renderers import JSONRenderer
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User 
 
 
 from .tools import get_units_with_due_date, title_or_url, bulk_email_is_enabled_for_course
@@ -60,7 +60,7 @@ def instructor_dashboard_2(request, course_id):
         _section_membership(course_id, access),
         _section_student_admin(course_id, access),
         _section_data_download(course_id, access),
-        _section_analytics(course_id, access),
+        _section_analytics(course_id, access), 
         _section_badges(course_id, access), 
     ]
 
