@@ -1,1 +1,0 @@
-class Badges.Models.Student extends Backbone.Model
