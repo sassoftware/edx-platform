@@ -26,6 +26,10 @@ from django_comment_common.models import FORUM_ROLE_ADMINISTRATOR
 from student.models import CourseEnrollment
 from bulk_email.models import CourseAuthorization
 from class_dashboard.dashboard_data import get_section_display_name, get_array_section_has_problem
+from user_api.serializers import UserSerializer
+from rest_framework.renderers import JSONRenderer
+from django.contrib.auth.models import User
+
 
 from .tools import get_units_with_due_date, title_or_url, bulk_email_is_enabled_for_course
 from opaque_keys.edx.locations import SlashSeparatedCourseKey
@@ -52,11 +56,20 @@ def instructor_dashboard_2(request, course_id):
         raise Http404()
 
     sections = [
+<<<<<<< HEAD
         _section_course_info(course_key, access),
         _section_membership(course_key, access),
         _section_student_admin(course_key, access),
         _section_data_download(course_key, access),
         _section_analytics(course_key, access),
+=======
+        _section_course_info(course_id, access),
+        _section_membership(course_id, access),
+        _section_student_admin(course_id, access),
+        _section_data_download(course_id, access),
+        _section_analytics(course_id, access),
+        _section_badges(course_id, access),
+>>>>>>> 3a2f421... Instructor Dashboard Creation
     ]
 
     if (settings.FEATURES.get('INDIVIDUAL_DUE_DATES') and access['instructor']):
@@ -247,6 +260,23 @@ def _section_analytics(course_key, access):
     }
     return section_data
 
+def _section_badges(course_id, access):
+    """ Provide data for the corresponding dashboard section """
+    enrolled_students = User.objects.filter(
+            courseenrollment__course_id=course_id,
+            courseenrollment__is_active=1,
+        ).order_by('username').select_related("profile")
+    serializer = UserSerializer(enrolled_students)
+    enrolled_json = JSONRenderer().render(serializer.data)
+    section_data = {
+        'section_key': 'badges',
+        'section_display_name': _('Badges'),
+        'access': access,
+        'enrolled_students': enrolled_json,
+        'get_distribution_url': reverse('get_distribution', kwargs={'course_id': course_id}),
+        'proxy_legacy_analytics_url': reverse('proxy_legacy_analytics', kwargs={'course_id': course_id}),
+    }
+    return section_data
 
 def _section_metrics(course_key, access):
     """Provide data for the corresponding dashboard section """
