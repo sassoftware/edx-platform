@@ -24,8 +24,8 @@ from courseware.courses import get_course_by_id, get_cms_course_link, get_course
 from django_comment_client.utils import has_forum_access
 from django_comment_common.models import FORUM_ROLE_ADMINISTRATOR
 from student.models import CourseEnrollment
-from bulk_email.models import CourseAuthorization
-from class_dashboard.dashboard_data import get_section_display_name, get_array_section_has_problem 
+from bulk_email.models import CourseAuthorization 
+from class_dashboard.dashboard_data import get_section_display_name, get_array_section_has_problem
 from user_api.serializers import UserSerializer
 from rest_framework.renderers import JSONRenderer
 from django.contrib.auth.models import User 
@@ -67,6 +67,9 @@ def instructor_dashboard_2(request, course_id):
         _section_badges(course_id, access),
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> 3a2f421... Instructor Dashboard Creation
+=======
 >>>>>>> 3a2f421... Instructor Dashboard Creation
 =======
 >>>>>>> 3a2f421... Instructor Dashboard Creation
