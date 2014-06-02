@@ -25,9 +25,9 @@ from django_comment_client.utils import has_forum_access
 from django_comment_common.models import FORUM_ROLE_ADMINISTRATOR
 from student.models import CourseEnrollment
 from bulk_email.models import CourseAuthorization
-from class_dashboard.dashboard_data import get_section_display_name, get_array_section_has_problem
-from user_api.serializers import UserSerializer 
-from rest_framework.renderers import JSONRenderer 
+from class_dashboard.dashboard_data import get_section_display_name, get_array_section_has_problem 
+from user_api.serializers import UserSerializer
+from rest_framework.renderers import JSONRenderer
 from django.contrib.auth.models import User 
 
 from .tools import get_units_with_due_date, title_or_url, bulk_email_is_enabled_for_course
@@ -66,6 +66,9 @@ def instructor_dashboard_2(request, course_id):
         _section_analytics(course_id, access),
         _section_badges(course_id, access),
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> 3a2f421... Instructor Dashboard Creation
+=======
 >>>>>>> 3a2f421... Instructor Dashboard Creation
 =======
 >>>>>>> 3a2f421... Instructor Dashboard Creation
