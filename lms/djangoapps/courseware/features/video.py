@@ -14,16 +14,17 @@ from cache_toolbox.core import del_cached_content
 from xmodule.contentstore.content import StaticContent
 from xmodule.contentstore.django import contentstore
 
+
 TEST_ROOT = settings.COMMON_TEST_DATA_ROOT
 LANGUAGES = settings.ALL_LANGUAGES
-
+VIDEO_SOURCE_PORT = settings.VIDEO_SOURCE_PORT
 
 ############### ACTIONS ####################
 
 HTML5_SOURCES = [
-    'https://s3.amazonaws.com/edx-course-videos/edx-intro/edX-FA12-cware-1_100.mp4',
-    'https://s3.amazonaws.com/edx-course-videos/edx-intro/edX-FA12-cware-1_100.webm',
-    'https://s3.amazonaws.com/edx-course-videos/edx-intro/edX-FA12-cware-1_100.ogv',
+    'http://localhost:{0}/gizmo.mp4'.format(VIDEO_SOURCE_PORT),
+    'http://localhost:{0}/gizmo.webm'.format(VIDEO_SOURCE_PORT),
+    'http://localhost:{0}/gizmo.ogv'.format(VIDEO_SOURCE_PORT),
 ]
 
 FLASH_SOURCES = {
@@ -34,7 +35,7 @@ FLASH_SOURCES = {
 }
 
 HTML5_SOURCES_INCORRECT = [
-    'https://s3.amazonaws.com/edx-course-videos/edx-intro/edX-FA12-cware-1_100.mp99',
+    'http://localhost:{0}/gizmo.mp99'.format(VIDEO_SOURCE_PORT),
 ]
 
 VIDEO_BUTTONS = {
@@ -54,6 +55,7 @@ VIDEO_MENUS = {
 }
 
 coursenum = 'test_course'
+
 
 @before.each_scenario
 def setUp(scenario):
@@ -178,8 +180,6 @@ def add_videos_to_course(course, player_mode=None, display_names=None, hashes=No
 
 def add_video_to_course(course, parent_location=None, player_mode=None, data=None, display_name='Video'):
 
-    assert_less(world.youtube.config['youtube_api_response'].status_code, 400, "Real Youtube server is unavailable")
-
     if not parent_location:
         parent_location = add_vertical_to_course(course)
     kwargs = get_metadata(parent_location, player_mode, data, display_name=display_name)
@@ -197,7 +197,7 @@ def add_vertical_to_course(course_num):
 
 
 def last_vertical_location(course_num):
-    return world.scenario_dict['LAST_VERTICAL'].location._replace(course=course_num)
+    return world.scenario_dict['LAST_VERTICAL'].location.replace(course=course_num)
 
 
 def upload_file(filename, location):
@@ -206,7 +206,7 @@ def upload_file(filename, location):
     mime_type = "application/json"
 
     content_location = StaticContent.compute_location(
-        location.org, location.course, filename
+        location.course_key, filename
     )
     content = StaticContent(content_location, filename, mime_type, f.read())
     contentstore().save(content)
@@ -438,7 +438,7 @@ def error_message_has_correct_text(_step):
 @step('I make sure captions are (.+)$')
 def set_captions_visibility_state(_step, captions_state):
     SELECTOR = '.closed .subtitles'
-    if world.is_css_not_present(SELECTOR, wait_time=30):
+    if world.is_css_not_present(SELECTOR):
         if captions_state == 'closed':
             world.css_click('.hide-subtitles')
     else:
@@ -482,6 +482,7 @@ def check_captions(_step):
 
 @step('I select language with code "([^"]*)"$')
 def select_language(_step, code):
+    world.wait_for_visible('.video-controls')
     # Make sure that all ajax requests that affects the language menu are finished.
     # For example, request to get new translation etc.
     world.wait_for_ajax_complete()
@@ -506,16 +507,19 @@ def select_language(_step, code):
 @step('I click video button "([^"]*)"$')
 def click_button(_step, button):
     world.css_click(VIDEO_BUTTONS[button])
+    if button == "play":
+        # Needs to wait for video buffrization
+        world.wait_for(
+            func=lambda _: world.css_has_class('.video', 'is-playing') and world.is_css_present(VIDEO_BUTTONS['pause']),
+            timeout=30
+        )
+
     world.wait_for_ajax_complete()
 
 
-@step('I see video slider at "([^"]*)" seconds$')
-def start_playing_video_from_n_seconds(_step, position):
-    world.wait_for(
-        func=lambda _: elapsed_time() > 0,
-        timeout=30
-    )
-
+@step('I see video slider at "([^"]*)" position$')
+def start_playing_video_from_n_seconds(_step, time_str):
+    position = parse_time_str(time_str)
     actual_position = elapsed_time()
     assert_equal(actual_position, int(position), "Current position is {}, but should be {}".format(actual_position, position))
 
@@ -530,12 +534,21 @@ def i_see_duration(_step, position):
     assert duration() == parse_time_str(position)
 
 
-@step('I seek video to "([^"]*)" seconds$')
-def seek_video_to_n_seconds(_step, seconds):
-    time = float(seconds.strip())
-    jsCode = "$('.video').data('video-player-state').videoPlayer.onSlideSeek({{time: {0:f}}})".format(time)
+@step('I wait for video controls appear$')
+def controls_appear(_step):
+    world.wait_for_visible('.video-controls')
+
+
+@step('I seek video to "([^"]*)" position$')
+def seek_video_to_n_seconds(_step, time_str):
+    time = parse_time_str(time_str)
+    jsCode = "$('.video').data('video-player-state').videoPlayer.onSlideSeek({{time: {0}}})".format(time)
     world.browser.execute_script(jsCode)
-    _step.given('I see video slider at "{}" seconds'.format(seconds))
+    world.wait_for(
+        func=lambda _: world.retry_on_exception(lambda: elapsed_time() == time and not world.css_has_class('.video', 'is-buffering')),
+        timeout=30
+    )
+    _step.given('I see video slider at "{0}" position'.format(time_str))
 
 
 @step('I have a "([^"]*)" transcript file in assets$')

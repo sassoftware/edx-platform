@@ -5,6 +5,65 @@ These are notable changes in edx-platform.  This is a rolling list of changes,
 in roughly chronological order, most recent first.  Add your entries at or near
 the top.  Include a label indicating the component affected.
 
+Blades: Redirect Chinese students to a Chinese CDN for video. BLD-1052.
+
+Studio: Show display names and help text in Advanced Settings. Also hide deprecated settings
+by default.
+
+Studio: Move Peer Assessment into advanced problems menu.
+
+Studio: Support creation and editing of split_test instances (Content Experiments)
+entirely in Studio. STUD-1658.
+
+Blades: Add context-aware video index. BLD-933
+
+Blades: Fix bug with incorrect link format and redirection. BLD-1049
+
+Blades: Fix bug with incorrect RelativeTime value after XML serialization. BLD-1060
+
+LMS: Update bulk email implementation to lessen load on the database
+by consolidating chunked queries for recipients into a single query.
+
+Blades: Fix link to javascript file in ChoiceTextResponse. BLD-1103.
+
+All: refactored code to handle course_ids, module_ids, etc in a cleaner way.
+See https://github.com/edx/edx-platform/wiki/Opaque-Keys for details.
+
+Blades: Remove Video player outline. BLD-975.
+
+Blades: Fix Youtube regular expression in video player editor. BLD-967.
+
+Studio: Support editing of containers. STUD-1312.
+
+Blades: Fix displaying transcripts on touch devices. BLD-1033.
+
+Blades: Tolerance expressed in percentage now computes correctly. BLD-522.
+
+Studio: Support add, delete and duplicate on the container page. STUD-1490.
+
+Studio: Add drag-and-drop support to the container page. STUD-1309.
+
+Common: Add extensible third-party auth module.
+
+Blades: Added new error message that displays when HTML5 video is not supported
+altogether. Make sure spinner gets hidden when error message is shown. BLD-638.
+
+LMS: Switch default instructor dashboard to the new (formerly "beta")
+  instructor dashboard. Puts the old (now "legacy") dash behind a feature flag.
+  LMS-1296
+
+Blades: Handle situation if no response were sent from XQueue to LMS in Matlab
+problem after Run Code button press. BLD-994.
+
+Blades: Set initial video quality to large instead of default to avoid automatic
+switch to HD when iframe resizes. BLD-981.
+
+Blades: Add an upload button for authors to provide students with an option to
+download a handout associated with a video (of arbitrary file format). BLD-1000.
+
+Studio: Add "raw HTML" editor so that authors can write HTML that will not be
+changed in any way. STUD-1562
+
 Blades: Show the HD button only if there is an HD version available. BLD-937.
 
 Studio: Add edit button to leaf xblocks on the container page. STUD-1306.
@@ -68,6 +127,9 @@ Blades: Fix for the list metadata editor that gets into a bad state where "Add"
 Blades: Add view for field type Dict in Studio. BLD-658.
 
 Blades: Refactor stub implementation of LTI Provider. BLD-601.
+
+LMS: multiple choice features: shuffle, answer-pool, targeted-feedback,
+choice name masking, submission timer
 
 Studio: Added ability to edit course short descriptions that appear on the course catalog page.
 
@@ -723,3 +785,5 @@ LMS: Option to email students when enroll/un-enroll them.
 
 Blades: Added WAI-ARIA markup to the video player controls. These are now fully
 accessible by screen readers.
+
+Common: Added advanced_module for annotating images to go with the ones for text and videos.

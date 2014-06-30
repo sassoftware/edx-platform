@@ -6,16 +6,21 @@ In this way, courses can be served up both - say - XMLModuleStore or MongoModule
 """
 
 import logging
+from uuid import uuid4
+from contextlib import contextmanager
+from opaque_keys import InvalidKeyError
 
 from . import ModuleStoreWriteBase
+from xmodule.modulestore import PublishState
 from xmodule.modulestore.django import create_modulestore_instance, loc_mapper
-from xmodule.modulestore import Location, SPLIT_MONGO_MODULESTORE_TYPE, XML_MODULESTORE_TYPE
-from xmodule.modulestore.locator import CourseLocator, Locator
-from xmodule.modulestore.exceptions import ItemNotFoundError, InvalidLocationError
-from uuid import uuid4
+from opaque_keys.edx.locator import CourseLocator, BlockUsageLocator
+from xmodule.modulestore.exceptions import ItemNotFoundError
+from opaque_keys.edx.keys import CourseKey, UsageKey
 from xmodule.modulestore.mongo.base import MongoModuleStore
 from xmodule.modulestore.split_mongo.split import SplitMongoModuleStore
-from xmodule.exceptions import UndefinedContext
+from opaque_keys.edx.locations import SlashSeparatedCourseKey
+import itertools
+
 
 log = logging.getLogger(__name__)
 
@@ -27,152 +32,219 @@ class MixedModuleStore(ModuleStoreWriteBase):
     def __init__(self, mappings, stores, i18n_service=None, **kwargs):
         """
         Initialize a MixedModuleStore. Here we look into our passed in kwargs which should be a
-        collection of other modulestore configuration informations
+        collection of other modulestore configuration information
         """
         super(MixedModuleStore, self).__init__(**kwargs)
 
-        self.modulestores = {}
-        self.mappings = mappings
+        self.modulestores = []
+        self.mappings = {}
 
-        if 'default' not in stores:
-            raise Exception('Missing a default modulestore in the MixedModuleStore __init__ method.')
+        for course_id, store_name in mappings.iteritems():
+            try:
+                self.mappings[CourseKey.from_string(course_id)] = store_name
+            except InvalidKeyError:
+                try:
+                    self.mappings[SlashSeparatedCourseKey.from_deprecated_string(course_id)] = store_name
+                except InvalidKeyError:
+                    log.exception("Invalid MixedModuleStore configuration. Unable to parse course_id %r", course_id)
+                    continue
 
-        for key, store in stores.iteritems():
-            is_xml = 'XMLModuleStore' in store['ENGINE']
+        for store_settings in stores:
+            key = store_settings['NAME']
+            is_xml = 'XMLModuleStore' in store_settings['ENGINE']
             if is_xml:
                 # restrict xml to only load courses in mapping
-                store['OPTIONS']['course_ids'] = [
-                    course_id
-                    for course_id, store_key in self.mappings.iteritems()
+                store_settings['OPTIONS']['course_ids'] = [
+                    course_key.to_deprecated_string()
+                    for course_key, store_key in self.mappings.iteritems()
                     if store_key == key
                 ]
-            self.modulestores[key] = create_modulestore_instance(
-                store['ENGINE'],
-                # XMLModuleStore's don't have doc store configs
-                store.get('DOC_STORE_CONFIG', {}),
-                store['OPTIONS'],
+            store = create_modulestore_instance(
+                store_settings['ENGINE'],
+                store_settings.get('DOC_STORE_CONFIG', {}),
+                store_settings.get('OPTIONS', {}),
                 i18n_service=i18n_service,
             )
-            # If and when locations can identify their course, we won't need
-            # these loc maps. They're needed for figuring out which store owns these locations.
-            if is_xml:
-                self.ensure_loc_maps_exist(key)
+            if key == 'split':
+                store.loc_mapper = loc_mapper()
+            # replace all named pointers to the store into actual pointers
+            for course_key, store_name in self.mappings.iteritems():
+                if store_name == key:
+                    self.mappings[course_key] = store
+            self.modulestores.append(store)
 
-    def _get_modulestore_for_courseid(self, course_id):
+    def _clean_course_id_for_mapping(self, course_id):
+        """
+        In order for mapping to work, the course_id must be minimal--no version, no branch--
+        as we never store one version or one branch in one ms and another in another ms.
+
+        :param course_id: the CourseKey
+        """
+        if hasattr(course_id, 'version_agnostic'):
+            course_id = course_id.version_agnostic()
+        if hasattr(course_id, 'branch_agnostic'):
+            course_id = course_id.branch_agnostic()
+        return course_id
+
+    def _get_modulestore_for_courseid(self, course_id=None):
         """
         For a given course_id, look in the mapping table and see if it has been pinned
         to a particular modulestore
-        """
-        # TODO when this becomes a router capable of handling more than one r/w backend
-        # we'll need to generalize this to handle mappings from old Locations w/o full
-        # course_id in much the same way as loc_mapper().translate_location does.
-        mapping = self.mappings.get(course_id, 'default')
-        return self.modulestores[mapping]
 
-    def has_item(self, course_id, reference):
+        If course_id is None, returns the first (ordered) store as the default
+        """
+        if course_id is not None:
+            course_id = self._clean_course_id_for_mapping(course_id)
+            mapping = self.mappings.get(course_id, None)
+            if mapping is not None:
+                return mapping
+            else:
+                for store in self.modulestores:
+                    if isinstance(course_id, store.reference_type) and store.has_course(course_id):
+                        self.mappings[course_id] = store
+                        return store
+
+        # return the first store, as the default
+        return self.modulestores[0]
+
+    def _get_modulestore_by_type(self, modulestore_type):
+        """
+        This method should only really be used by tests and migration scripts when necessary.
+        Returns the module store as requested by type.  The type can be a value from ModuleStoreEnum.Type.
+        """
+        for store in self.modulestores:
+            if store.get_modulestore_type() == modulestore_type:
+                return store
+        return None
+
+    def has_item(self, usage_key, **kwargs):
         """
         Does the course include the xblock who's id is reference?
-
-        :param course_id: a course_id or package_id (slashed or dotted)
-        :param reference: a Location or BlockUsageLocator
         """
-        store = self._get_modulestore_for_courseid(course_id)
-        return store.has_item(course_id, reference)
+        store = self._get_modulestore_for_courseid(usage_key.course_key)
+        return store.has_item(usage_key, **kwargs)
 
-    def get_item(self, location, depth=0):
+    def get_item(self, usage_key, depth=0, **kwargs):
         """
         This method is explicitly not implemented as we need a course_id to disambiguate
         We should be able to fix this when the data-model rearchitecting is done
         """
-        # Although we shouldn't have both get_item and get_instance imho
-        raise NotImplementedError
+        store = self._get_modulestore_for_courseid(usage_key.course_key)
+        return store.get_item(usage_key, depth, **kwargs)
 
-    def get_instance(self, course_id, location, depth=0):
-        store = self._get_modulestore_for_courseid(course_id)
-        return store.get_instance(course_id, location, depth)
-
-    def get_items(self, location, course_id=None, depth=0, qualifiers=None):
+    def get_items(self, course_key, settings=None, content=None, **kwargs):
         """
-        Returns a list of XModuleDescriptor instances for the items
-        that match location. Any element of location that is None is treated
-        as a wildcard that matches any value. NOTE: don't use this to look for courses
-        as the course_id is required. Use get_courses.
+        Returns:
+            list of XModuleDescriptor instances for the matching items within the course with
+            the given course_key
 
-        location: either a Location possibly w/ None as wildcards for category or name or
-        a Locator with at least a package_id and branch but possibly no block_id.
+        NOTE: don't use this to look for courses
+        as the course_key is required. Use get_courses.
 
-        depth: An argument that some module stores may use to prefetch
-            descendants of the queried modules for more efficient results later
-            in the request. The depth is counted in the number of calls to
-            get_children() to cache. None indicates to cache all descendants
+        Args:
+            course_key (CourseKey): the course identifier
+            settings (dict): fields to look for which have settings scope. Follows same syntax
+                and rules as kwargs below
+            content (dict): fields to look for which have content scope. Follows same syntax and
+                rules as kwargs below.
+            kwargs (key=value): what to look for within the course.
+                Common qualifiers are ``category`` or any field name. if the target field is a list,
+                then it searches for the given value in the list not list equivalence.
+                Substring matching pass a regex object.
+                For some modulestores, ``name`` is another commonly provided key (Location based stores)
+                For some modulestores,
+                you can search by ``edited_by``, ``edited_on`` providing either a datetime for == (probably
+                useless) or a function accepting one arg to do inequality
         """
-        if not (course_id or hasattr(location, 'package_id')):
-            raise Exception("Must pass in a course_id when calling get_items()")
+        if not isinstance(course_key, CourseKey):
+            raise Exception("Must pass in a course_key when calling get_items()")
 
-        store = self._get_modulestore_for_courseid(course_id or getattr(location, 'package_id'))
-        return store.get_items(location, course_id, depth, qualifiers)
-
-    def _get_course_id_from_course_location(self, course_location):
-        """
-        Get the proper course_id based on the type of course_location
-        """
-        return getattr(course_location, 'course_id', None) or getattr(course_location, 'package_id', None)
+        store = self._get_modulestore_for_courseid(course_key)
+        return store.get_items(course_key, settings, content, **kwargs)
 
     def get_courses(self):
         '''
-        Returns a list containing the top level XModuleDescriptors of the courses
-        in this modulestore.
+        Returns a list containing the top level XModuleDescriptors of the courses in this modulestore.
         '''
-        # order the modulestores and ensure no dupes (default may be a dupe of a named store)
-        # remove 'draft' as we know it's a functional dupe of 'direct' (ugly hardcoding)
-        stores = set([value for key, value in self.modulestores.iteritems() if key != 'draft'])
-        stores = sorted(stores, cmp=_compare_stores)
+        courses = {}  # a dictionary of course keys to course objects
 
-        courses = {}  # a dictionary of stringified course locations to course objects
-        has_locators = any(issubclass(CourseLocator, store.reference_type) for store in stores)
-        for store in stores:
-            store_courses = store.get_courses()
+        # first populate with the ones in mappings as the mapping override discovery
+        for course_id, store in self.mappings.iteritems():
+            course = store.get_course(course_id)
+            # check if the course is not None - possible if the mappings file is outdated
+            # TODO - log an error if the course is None, but move it to an initialization method to keep it less noisy
+            if course is not None:
+                courses[course_id] = store.get_course(course_id)
+
+        has_locators = any(issubclass(CourseLocator, store.reference_type) for store in self.modulestores)
+        for store in self.modulestores:
+
             # filter out ones which were fetched from earlier stores but locations may not be ==
-            for course in store_courses:
-                course_location = unicode(course.location)
-                if course_location not in courses:
-                    if has_locators and isinstance(course.location, Location):
+            for course in store.get_courses():
+                course_id = self._clean_course_id_for_mapping(course.id)
+                if course_id not in courses:
+                    if has_locators and isinstance(course_id, SlashSeparatedCourseKey):
+
                         # see if a locator version of course is in the result
                         try:
-                            # if there's no existing mapping, then the course can't have been in split
-                            course_locator = loc_mapper().translate_location(
-                                course.location.course_id, course.location, add_entry_if_missing=False
-                            )
-                            if unicode(course_locator) not in courses:
-                                courses[course_location] = course
+                            course_locator = loc_mapper().translate_location_to_course_locator(course_id)
+                            if course_locator in courses:
+                                continue
                         except ItemNotFoundError:
-                            courses[course_location] = course
-                    else:
-                        courses[course_location] = course
+                            # if there's no existing mapping, then the course can't have been in split
+                            pass
+
+                    # course is indeed unique. save it in result
+                    courses[course_id] = course
 
         return courses.values()
 
-    def get_course(self, course_id):
+    def get_course(self, course_key, depth=0):
         """
         returns the course module associated with the course_id. If no such course exists,
         it returns None
 
-        :param course_id: must be either a string course_id or a CourseLocator
+        :param course_key: must be a CourseKey
         """
-        store = self._get_modulestore_for_courseid(
-            course_id.package_id if hasattr(course_id, 'package_id') else course_id
-        )
+        assert(isinstance(course_key, CourseKey))
+        store = self._get_modulestore_for_courseid(course_key)
         try:
-            return store.get_course(course_id)
+            return store.get_course(course_key, depth=depth)
         except ItemNotFoundError:
             return None
 
-    def get_parent_locations(self, location, course_id):
+    def has_course(self, course_id, ignore_case=False):
         """
-        returns the parent locations for a given location and course_id
+        returns the course_id of the course if it was found, else None
+        Note: we return the course_id instead of a boolean here since the found course may have
+           a different id than the given course_id when ignore_case is True.
+
+        Args:
+        * course_id (CourseKey)
+        * ignore_case (bool): If True, do a case insensitive search. If
+            False, do a case sensitive search
         """
+        assert(isinstance(course_id, CourseKey))
         store = self._get_modulestore_for_courseid(course_id)
-        return store.get_parent_locations(location, course_id)
+        return store.has_course(course_id, ignore_case)
+
+    def delete_course(self, course_key, user_id=None):
+        """
+        See xmodule.modulestore.__init__.ModuleStoreWrite.delete_course
+        """
+        assert(isinstance(course_key, CourseKey))
+        store = self._get_modulestore_for_courseid(course_key)
+        if hasattr(store, 'delete_course'):
+            return store.delete_course(course_key, user_id)
+        else:
+            raise NotImplementedError(u"Cannot delete a course on store {}".format(store))
+
+    def get_parent_location(self, location, **kwargs):
+        """
+        returns the parent locations for a given location
+        """
+        store = self._get_modulestore_for_courseid(location.course_key)
+        return store.get_parent_location(location, **kwargs)
 
     def get_modulestore_type(self, course_id):
         """
@@ -182,17 +254,16 @@ class MixedModuleStore(ModuleStoreWriteBase):
         "mongo" for old-style MongoDB backed courses,
         "split" for new-style split MongoDB backed courses.
         """
-        return self._get_modulestore_for_courseid(course_id).get_modulestore_type(course_id)
+        return self._get_modulestore_for_courseid(course_id).get_modulestore_type()
 
-    def get_orphans(self, course_location, branch):
+    def get_orphans(self, course_key):
         """
         Get all of the xblocks in the given course which have no parents and are not of types which are
         usually orphaned. NOTE: may include xblocks which still have references via xblocks which don't
         use children to point to their dependents.
         """
-        course_id = self._get_course_id_from_course_location(course_location)
-        store = self._get_modulestore_for_courseid(course_id)
-        return store.get_orphans(course_location, branch)
+        store = self._get_modulestore_for_courseid(course_key)
+        return store.get_orphans(course_key)
 
     def get_errored_courses(self):
         """
@@ -200,110 +271,29 @@ class MixedModuleStore(ModuleStoreWriteBase):
         course_dir where course loading failed.
         """
         errs = {}
-        for store in self.modulestores.values():
+        for store in self.modulestores:
             errs.update(store.get_errored_courses())
         return errs
 
-    def _get_course_id_from_block(self, block, store):
-        """
-        Get the course_id from the block or from asking its store. Expensive.
-        """
-        try:
-            return block.course_id
-        except UndefinedContext:
-            pass
-        try:
-            course = store._get_course_for_item(block.scope_ids.usage_id)
-            if course is not None:
-                return course.scope_ids.usage_id.course_id
-        except Exception:  # sorry, that method just raises vanilla Exception if it doesn't find course
-            pass
-
-    def _infer_course_id_try(self, location):
-        """
-        Create, Update, Delete operations don't require a fully-specified course_id, but
-        there's no complete & sound general way to compute the course_id except via the
-        proper modulestore. This method attempts several sound but not complete methods.
-        :param location: an old style Location
-        """
-        if isinstance(location, CourseLocator):
-            return location.package_id
-        elif isinstance(location, basestring):
-            try:
-                location = Location(location)
-            except InvalidLocationError:
-                # try to parse as a course_id
-                try:
-                    Location.parse_course_id(location)
-                    # it's already a course_id
-                    return location
-                except ValueError:
-                    # cannot interpret the location
-                    return None
-
-        # location is a Location at this point
-        if location.category == 'course':  # easiest case
-            return location.course_id
-        # try finding in loc_mapper
-        try:
-            # see if the loc mapper knows the course id (requires double translation)
-            locator = loc_mapper().translate_location_to_course_locator(None, location)
-            location = loc_mapper().translate_locator_to_location(locator, get_course=True)
-            return location.course_id
-        except ItemNotFoundError:
-            pass
-        # expensive query against all location-based modulestores to look for location.
-        for store in self.modulestores.itervalues():
-            if isinstance(location, store.reference_type):
-                try:
-                    xblock = store.get_item(location)
-                    course_id = self._get_course_id_from_block(xblock, store)
-                    if course_id is not None:
-                        return course_id
-                except NotImplementedError:
-                    blocks = store.get_items(location)
-                    if len(blocks) == 1:
-                        block = blocks[0]
-                        try:
-                            return block.course_id
-                        except UndefinedContext:
-                            pass
-                except ItemNotFoundError:
-                    pass
-        # if we get here, it must be in a Locator based store, but we won't be able to find
-        # it.
-        return None
-
-    def create_course(self, course_id, user_id=None, store_name='default', **kwargs):
+    def create_course(self, org, offering, user_id=None, fields=None, **kwargs):
         """
         Creates and returns the course.
 
-        :param org: the org
-        :param fields: a dict of xblock field name - value pairs for the course module.
-        :param metadata: the old way of setting fields by knowing which ones are scope.settings v scope.content
-        :param definition_data: the complement to metadata which is also a subset of fields
-        :returns: course xblock
+        Args:
+            org (str): the organization that owns the course
+            offering (str): the name of the course offering
+            user_id: id of the user creating the course
+            fields (dict): Fields to set on the course at initialization
+            kwargs: Any optional arguments understood by a subset of modulestores to customize instantiation
+
+        Returns: a CourseDescriptor
         """
-        store = self.modulestores[store_name]
+        store = self._get_modulestore_for_courseid(None)
+
         if not hasattr(store, 'create_course'):
-            raise NotImplementedError(u"Cannot create a course on store %s" % store_name)
-        if store.get_modulestore_type(course_id) == SPLIT_MONGO_MODULESTORE_TYPE:
-            try:
-                course_dict = Location.parse_course_id(course_id)
-                org = course_dict['org']
-                course_id = "{org}.{course}.{name}".format(**course_dict)
-            except ValueError:
-                org = None
+            raise NotImplementedError(u"Cannot create a course on store {}".format(store))
 
-            org = kwargs.pop('org', org)
-            fields = kwargs.pop('fields', {})
-            fields.update(kwargs.pop('metadata', {}))
-            fields.update(kwargs.pop('definition_data', {}))
-            course = store.create_course(course_id, org, user_id, fields=fields, **kwargs)
-        else:  # assume mongo
-            course = store.create_course(course_id, **kwargs)
-
-        return course
+        return store.create_course(org, offering, user_id, fields, **kwargs)
 
     def create_item(self, course_or_parent_loc, category, user_id=None, **kwargs):
         """
@@ -311,46 +301,30 @@ class MixedModuleStore(ModuleStoreWriteBase):
         it installs the new item as a child of the parent (if the parent_loc is a specific
         xblock reference).
 
-        :param course_or_parent_loc: Can be a course_id (org/course/run), CourseLocator,
-        Location, or BlockUsageLocator but must be what the persistence modulestore expects
+        :param course_or_parent_loc: Can be a CourseKey or UsageKey
+        :param category (str): The block_type of the item we are creating
         """
         # find the store for the course
-        course_id = self._infer_course_id_try(course_or_parent_loc)
-        if course_id is None:
-            raise ItemNotFoundError(u"Cannot find modulestore for %s" % course_or_parent_loc)
-
+        course_id = getattr(course_or_parent_loc, 'course_key', course_or_parent_loc)
         store = self._get_modulestore_for_courseid(course_id)
 
         location = kwargs.pop('location', None)
         # invoke its create_item
         if isinstance(store, MongoModuleStore):
             block_id = kwargs.pop('block_id', getattr(location, 'name', uuid4().hex))
-            # convert parent loc if it's legit
-            if isinstance(course_or_parent_loc, basestring):
-                parent_loc = None
-                if location is None:
-                    loc_dict = Location.parse_course_id(course_id)
-                    loc_dict['name'] = block_id
-                    location = Location(category=category, **loc_dict)
-            else:
-                parent_loc = course_or_parent_loc
-                # must have a legitimate location, compute if appropriate
-                if location is None:
-                    location = parent_loc.replace(category=category, name=block_id)
+            parent_loc = course_or_parent_loc if isinstance(course_or_parent_loc, UsageKey) else None
+            # must have a legitimate location, compute if appropriate
+            if location is None:
+                location = course_id.make_usage_key(category, block_id)
             # do the actual creation
-            xblock = store.create_and_save_xmodule(location, **kwargs)
+            xblock = self.create_and_save_xmodule(location, user_id, **kwargs)
             # don't forget to attach to parent
             if parent_loc is not None and not 'detached' in xblock._class_tags:
                 parent = store.get_item(parent_loc)
-                parent.children.append(location.url())
+                parent.children.append(location)
                 store.update_item(parent)
         elif isinstance(store, SplitMongoModuleStore):
-            if isinstance(course_or_parent_loc, basestring):  # course_id
-                course_or_parent_loc = loc_mapper().translate_location_to_course_locator(
-                    # hardcode draft version until we figure out how we're handling branches from app
-                    course_or_parent_loc, None, published=False
-                )
-            elif not isinstance(course_or_parent_loc, CourseLocator):
+            if not isinstance(course_or_parent_loc, (CourseLocator, BlockUsageLocator)):
                 raise ValueError(u"Cannot create a child of {} in split. Wrong repr.".format(course_or_parent_loc))
 
             # split handles all the fields in one dict not separated by scope
@@ -370,46 +344,38 @@ class MixedModuleStore(ModuleStoreWriteBase):
         Update the xblock persisted to be the same as the given for all types of fields
         (content, children, and metadata) attribute the change to the given user.
         """
-        course_id = self._infer_course_id_try(xblock.scope_ids.usage_id)
-        if course_id is None:
-            raise ItemNotFoundError(u"Cannot find modulestore for %s" % xblock.scope_ids.usage_id)
-        store = self._get_modulestore_for_courseid(course_id)
-        return store.update_item(xblock, user_id)
+        store = self._verify_modulestore_support(xblock.location, 'update_item')
+        return store.update_item(xblock, user_id, allow_not_found)
 
     def delete_item(self, location, user_id=None, **kwargs):
         """
         Delete the given item from persistence. kwargs allow modulestore specific parameters.
         """
-        course_id = self._infer_course_id_try(location)
-        if course_id is None:
-            raise ItemNotFoundError(u"Cannot find modulestore for %s" % location)
-        store = self._get_modulestore_for_courseid(course_id)
-        return store.delete_item(location, user_id=user_id, **kwargs)
+        store = self._verify_modulestore_support(location, 'delete_item')
+        store.delete_item(location, user_id=user_id, **kwargs)
 
     def close_all_connections(self):
         """
         Close all db connections
         """
-        for mstore in self.modulestores.itervalues():
+        for mstore in self.modulestores:
             if hasattr(mstore, 'database'):
                 mstore.database.connection.close()
             elif hasattr(mstore, 'db'):
                 mstore.db.connection.close()
 
-    def ensure_loc_maps_exist(self, store_name):
+    def create_xmodule(self, location, definition_data=None, metadata=None, runtime=None, fields={}):
         """
-        Ensure location maps exist for every course in the modulestore whose
-        name is the given name (mostly used for 'xml'). It creates maps for any
-        missing ones.
+        Create the new xmodule but don't save it. Returns the new module.
 
-        NOTE: will only work if the given store is Location based. If it's not,
-        it raises NotImplementedError
+        :param location: a Location--must have a category
+        :param definition_data: can be empty. The initial definition_data for the kvs
+        :param metadata: can be empty, the initial metadata for the kvs
+        :param runtime: if you already have an xblock from the course, the xblock.runtime value
+        :param fields: a dictionary of field names and values for the new xmodule
         """
-        store = self.modulestores[store_name]
-        if store.reference_type != Location:
-            raise ValueError(u"Cannot create maps from %s" % store.reference_type)
-        for course in store.get_courses():
-            loc_mapper().translate_location(course.location.course_id, course.location)
+        store = self._verify_modulestore_support(location, 'create_xmodule')
+        return store.create_xmodule(location, definition_data, metadata, runtime, fields)
 
     def get_courses_for_wiki(self, wiki_slug):
         """
@@ -418,33 +384,126 @@ class MixedModuleStore(ModuleStoreWriteBase):
         :return: list of course locations
         """
         courses = []
-        for modulestore in self.modulestores.values():
+        for modulestore in self.modulestores:
             courses.extend(modulestore.get_courses_for_wiki(wiki_slug))
         return courses
 
+    def heartbeat(self):
+        """
+        Delegate to each modulestore and package the results for the caller.
+        """
+        # could be done in parallel threads if needed
+        return dict(
+            itertools.chain.from_iterable(
+                store.heartbeat().iteritems()
+                for store in self.modulestores
+            )
+        )
 
-def _compare_stores(left, right):
-    """
-    Order stores via precedence: if a course is found in an earlier store, it shadows the later store.
+    def compute_publish_state(self, xblock):
+        """
+        Returns whether this xblock is draft, public, or private.
 
-    xml stores take precedence b/c they only contain hardcoded mappings, then Locator-based ones,
-    then others. Locators before Locations because if some courses may be in both,
-    the ones in the Locator-based stores shadow the others.
-    """
-    if left.get_modulestore_type(None) == XML_MODULESTORE_TYPE:
-        if right.get_modulestore_type(None) == XML_MODULESTORE_TYPE:
-            return 0
+        Returns:
+            PublishState.draft - content is in the process of being edited, but still has a previous
+                version deployed to LMS
+            PublishState.public - content is locked and deployed to LMS
+            PublishState.private - content is editable and not deployed to LMS
+        """
+        course_id = xblock.scope_ids.usage_id.course_key
+        store = self._get_modulestore_for_courseid(course_id)
+        if hasattr(store, 'compute_publish_state'):
+            return store.compute_publish_state(xblock)
+        elif hasattr(store, 'publish'):
+            raise NotImplementedError(u"Cannot compute_publish_state on store {}".format(store))
         else:
-            return -1
-    elif right.get_modulestore_type(None) == XML_MODULESTORE_TYPE:
-        return 1
+            # read-only store; so, everything's public
+            return PublishState.public
 
-    if issubclass(left.reference_type, Locator):
-        if issubclass(right.reference_type, Locator):
-            return 0
+    def publish(self, location, user_id):
+        """
+        Save a current draft to the underlying modulestore
+        Returns the newly published item.
+        """
+        store = self._verify_modulestore_support(location, 'publish')
+        return store.publish(location, user_id)
+
+    def unpublish(self, location, user_id):
+        """
+        Save a current draft to the underlying modulestore
+        Returns the newly unpublished item.
+        """
+        store = self._verify_modulestore_support(location, 'unpublish')
+        return store.unpublish(location, user_id)
+
+    def convert_to_draft(self, location, user_id):
+        """
+        Create a copy of the source and mark its revision as draft.
+        Note: This method is to support the Mongo Modulestore and may be deprecated.
+
+        :param source: the location of the source (its revision must be None)
+        """
+        store = self._verify_modulestore_support(location, 'convert_to_draft')
+        return store.convert_to_draft(location, user_id)
+
+    def _verify_modulestore_support(self, location, method):
+        """
+        Finds and returns the store that contains the course for the given location, and verifying
+        that the store supports the given method.
+
+        Raises NotImplementedError if the found store does not support the given method.
+        """
+        course_id = location.course_key
+        store = self._get_modulestore_for_courseid(course_id)
+        if hasattr(store, method):
+            return store
         else:
-            return -1
-    elif issubclass(right.reference_type, Locator):
-        return 1
+            raise NotImplementedError(u"Cannot call {} on store {}".format(method, store))
 
-    return 0
+
+@contextmanager
+def store_branch_setting(store, branch_setting):
+    """
+    A context manager for temporarily setting a store's branch value
+
+    Note: to be effective, the store must be a direct pointer to the underlying store;
+        not the intermediary Mixed store.
+    """
+    assert not isinstance(store, MixedModuleStore)
+
+    try:
+        previous_branch_setting_func = store.branch_setting_func
+        store.branch_setting_func = lambda: branch_setting
+        yield
+    finally:
+        store.branch_setting_func = previous_branch_setting_func
+
+
+@contextmanager
+def store_bulk_write_operations_on_course(store, course_id):
+    """
+    A context manager for notifying the store of bulk write events.
+
+    In the case of Mongo, it temporarily disables refreshing the metadata inheritance tree
+    until the bulk operation is completed.
+
+    The store can be either the Mixed modulestore or a direct pointer to the underlying store.
+    """
+
+    # TODO
+    # Make this multi-process-safe if future operations need it.
+    # Right now, only Import Course, Clone Course, and Delete Course use this, so
+    # it's ok if the cached metadata in the memcache is invalid when another
+    # request comes in for the same course.
+
+    # if the caller passed in the mixed modulestore, get a direct pointer to the underlying store
+    if hasattr(store, '_get_modulestore_by_course_id'):
+        store = store._get_modulestore_by_course_id(course_id)
+
+    try:
+        if hasattr(store, 'begin_bulk_write_operation_on_course'):
+            store.begin_bulk_write_operation_on_course(course_id)
+        yield
+    finally:
+        if hasattr(store, 'begin_bulk_write_operation_on_course'):
+            store.end_bulk_write_operation_on_course(course_id)

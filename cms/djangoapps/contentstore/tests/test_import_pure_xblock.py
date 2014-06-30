@@ -2,15 +2,13 @@
 Integration tests for importing courses containing pure XBlocks.
 """
 
-from django.test.utils import override_settings
-
 from xblock.core import XBlock
 from xblock.fields import String
 
 from xmodule.modulestore.xml_importer import import_from_xml
 from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
 from xmodule.modulestore.django import modulestore
-from contentstore.tests.modulestore_config import TEST_MODULESTORE
+from xmodule.modulestore.mongo.draft import as_draft
 
 
 class StubXBlock(XBlock):
@@ -28,18 +26,15 @@ class StubXBlock(XBlock):
     test_field = String(default="default")
 
 
-@override_settings(MODULESTORE=TEST_MODULESTORE)
 class XBlockImportTest(ModuleStoreTestCase):
 
     def setUp(self):
-        self.store = modulestore('direct')
-        self.draft_store = modulestore('default')
+        self.store = modulestore()
 
     @XBlock.register_temp_plugin(StubXBlock)
     def test_import_public(self):
         self._assert_import(
             'pure_xblock_public',
-            'i4x://edX/pure_xblock_public/stubxblock/xblock_test',
             'set by xml'
         )
 
@@ -47,12 +42,11 @@ class XBlockImportTest(ModuleStoreTestCase):
     def test_import_draft(self):
         self._assert_import(
             'pure_xblock_draft',
-            'i4x://edX/pure_xblock_draft/stubxblock/xblock_test@draft',
             'set by xml',
             has_draft=True
         )
 
-    def _assert_import(self, course_dir, expected_xblock_loc, expected_field_val, has_draft=False):
+    def _assert_import(self, course_dir, expected_field_val, has_draft=False):
         """
         Import a course from XML, then verify that the XBlock was loaded
         with the correct field value.
@@ -67,16 +61,21 @@ class XBlockImportTest(ModuleStoreTestCase):
                 the expected field value set.
 
         """
-        import_from_xml(
-            self.store, 'common/test/data', [course_dir],
-            draft_store=self.draft_store
+        _, courses = import_from_xml(
+            self.store, '**replace_user**', 'common/test/data', [course_dir]
         )
 
-        xblock = self.store.get_item(expected_xblock_loc)
+        xblock_location = courses[0].id.make_usage_key('stubxblock', 'xblock_test')
+
+        if has_draft:
+            xblock_location = as_draft(xblock_location)
+
+        xblock = self.store.get_item(xblock_location)
         self.assertTrue(isinstance(xblock, StubXBlock))
         self.assertEqual(xblock.test_field, expected_field_val)
 
         if has_draft:
-            draft_xblock = self.draft_store.get_item(expected_xblock_loc)
+            draft_xblock = self.store.get_item(xblock_location)
+            self.assertTrue(getattr(draft_xblock, 'is_draft', False))
             self.assertTrue(isinstance(draft_xblock, StubXBlock))
             self.assertEqual(draft_xblock.test_field, expected_field_val)

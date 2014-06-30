@@ -10,8 +10,8 @@ from lettuce.django import django_url
 from django.contrib.auth.models import User
 from django.core.urlresolvers import reverse
 from student.models import CourseEnrollment
-from xmodule.modulestore import Location
 from xmodule.modulestore.django import modulestore
+from opaque_keys.edx.locations import SlashSeparatedCourseKey
 from xmodule.course_module import CourseDescriptor
 from courseware.courses import get_course_by_id
 from xmodule import seq_module, vertical_module
@@ -35,7 +35,7 @@ def configure_screenshots_for_all_steps(_step, action):
     else:
         raise ValueError('Parameter `action` should be one of "enable" or "disable".')
 
-
+@world.absorb
 def capture_screenshot_before_after(func):
     """
     A decorator that will take a screenshot before and after the applied
@@ -119,16 +119,23 @@ def go_into_course(step):
 
 
 def course_id(course_num):
-    return "%s/%s/%s" % (world.scenario_dict['COURSE'].org, course_num,
-                         world.scenario_dict['COURSE'].url_name)
+    return SlashSeparatedCourseKey(
+        world.scenario_dict['COURSE'].org,
+        course_num,
+        world.scenario_dict['COURSE'].url_name
+    )
 
 
 def course_location(course_num):
-    return world.scenario_dict['COURSE'].location._replace(course=course_num)
+    return world.scenario_dict['COURSE'].location.replace(course=course_num)
 
 
 def section_location(course_num):
-    return world.scenario_dict['SECTION'].location._replace(course=course_num)
+    return world.scenario_dict['SECTION'].location.replace(course=course_num)
+
+
+def publish(location):
+    modulestore().publish(location, '**replace_user**')
 
 
 def visit_scenario_item(item_key):
@@ -140,8 +147,8 @@ def visit_scenario_item(item_key):
     url = django_url(reverse(
         'jump_to',
         kwargs={
-            'course_id': world.scenario_dict['COURSE'].id,
-            'location': str(world.scenario_dict[item_key].location),
+            'course_id': world.scenario_dict['COURSE'].id.to_deprecated_string(),
+            'location': world.scenario_dict[item_key].location.to_deprecated_string(),
         }
     ))
 

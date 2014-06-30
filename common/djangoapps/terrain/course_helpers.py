@@ -5,7 +5,8 @@ import urllib
 from lettuce import world
 from django.contrib.auth.models import User, Group
 from student.models import CourseEnrollment
-from xmodule.modulestore.django import editable_modulestore
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore import ModuleStoreEnum
 from xmodule.contentstore.django import contentstore
 
 
@@ -43,7 +44,7 @@ def log_in(username='robot', password='test', email='robot@edx.org', name="Robot
 
 
 @world.absorb
-def register_by_course_id(course_id, username='robot', password='test', is_staff=False):
+def register_by_course_key(course_key, username='robot', password='test', is_staff=False):
     create_user(username, password)
     user = User.objects.get(username=username)
     # Note: this flag makes the user global staff - that is, an edX employee - not a course staff.
@@ -51,17 +52,17 @@ def register_by_course_id(course_id, username='robot', password='test', is_staff
     if is_staff:
         user.is_staff = True
         user.save()
-    CourseEnrollment.enroll(user, course_id)
+    CourseEnrollment.enroll(user, course_key)
 
 
 @world.absorb
-def enroll_user(user, course_id):
+def enroll_user(user, course_key):
     # Activate user
     registration = world.RegistrationFactory(user=user)
     registration.register(user)
     registration.activate()
     # Enroll them in the course
-    CourseEnrollment.enroll(user, course_id)
+    CourseEnrollment.enroll(user, course_key)
 
 
 @world.absorb
@@ -71,5 +72,6 @@ def clear_courses():
     # (though it shouldn't), do this manually
     # from the bash shell to drop it:
     # $ mongo test_xmodule --eval "db.dropDatabase()"
-    editable_modulestore().collection.drop()
+    store = modulestore()._get_modulestore_by_type(ModuleStoreEnum.Type.mongo)
+    store.collection.drop()
     contentstore().fs_files.drop()

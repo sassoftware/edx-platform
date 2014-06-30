@@ -10,6 +10,7 @@ in the user's session.
 This middleware must be placed before the LocaleMiddleware, but after
 the SessionMiddleware.
 """
+from django.conf import settings
 
 from django.utils.translation.trans_real import parse_accept_lang_header
 
@@ -33,6 +34,7 @@ def dark_parse_accept_lang_header(accept):
     for lang, priority in browser_langs:
         lang = CHINESE_LANGUAGE_CODE_MAP.get(lang.lower(), lang)
         django_langs.append((lang, priority))
+
     return django_langs
 
 # If django 1.7 or higher is used, the right-side can be updated with new-style codes.
@@ -42,11 +44,10 @@ CHINESE_LANGUAGE_CODE_MAP = {
     'zh-hans-cn': 'zh-CN',  # Chinese (Simplified, China)
     'zh-hans-sg': 'zh-CN',  # Chinese (Simplified, Singapore)
     'zh-hant': 'zh-TW',     # Chinese (Traditional)
-    'zh-hant-hk': 'zh-TW',  # Chinese (Traditional, Hongkong)
+    'zh-hant-hk': 'zh-HK',  # Chinese (Traditional, Hongkong)
     'zh-hant-mo': 'zh-TW',  # Chinese (Traditional, Macau)
     'zh-hant-tw': 'zh-TW',  # Chinese (Traditional, Taiwan)
     # The following are the old-style language codes that django does not recognize
-    'zh-hk': 'zh-TW',       # Chinese (Traditional, Hongkong)
     'zh-mo': 'zh-TW',       # Chinese (Traditional, Macau)
     'zh-sg': 'zh-CN',       # Chinese (Simplified, Singapore)
 }
@@ -65,7 +66,10 @@ class DarkLangMiddleware(object):
         """
         Current list of released languages
         """
-        return DarkLangConfig.current().released_languages_list
+        language_options = DarkLangConfig.current().released_languages_list
+        if settings.LANGUAGE_CODE not in language_options:
+            language_options.append(settings.LANGUAGE_CODE)
+        return language_options
 
     def process_request(self, request):
         """

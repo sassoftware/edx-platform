@@ -5,6 +5,7 @@ describe "DiscussionThreadInlineView", ->
             <script type="text/template" id="_inline_thread">
                 <article class="discussion-article">
                     <div class="non-cohorted-indicator"/>
+                    <div class="post-body"/>
                     <div class="post-extended-content">
                         <div class="response-count"/> 
                         <ol class="responses"/>
@@ -19,6 +20,7 @@ describe "DiscussionThreadInlineView", ->
             <script type="text/template" id="_inline_thread_cohorted">
                 <article class="discussion-article">
                     <div class="cohorted-indicator"/>
+                    <div class="post-body"/>
                     <div class="post-extended-content">
                         <div class="response-count"/> 
                         <ol class="responses"/>
@@ -46,6 +48,7 @@ describe "DiscussionThreadInlineView", ->
         spyOn($, "ajax")
         # Avoid unnecessary boilerplate
         spyOn(@view.showView, "render")
+        spyOn(@view.showView, "convertMath")
         spyOn(@view, "makeWmdEditor")
         spyOn(DiscussionThreadView.prototype, "renderResponse")
 
@@ -87,3 +90,17 @@ describe "DiscussionThreadInlineView", ->
             assertExpandedContentVisible(@view, true)
             @view.collapsePost()
             assertExpandedContentVisible(@view, false)
+
+        it "switches between the abbreviated and full body", ->
+            DiscussionViewSpecHelper.setNextResponseContent({resp_total: 0, children: []})
+            @thread.set("body", new Array(100).join("test "))
+            @view.abbreviateBody()
+            expect(@thread.get("body")).not.toEqual(@thread.get("abbreviatedBody"))
+            @view.render()
+            @view.expandPost()
+            expect(@view.$el.find(".post-body").text()).toEqual(@thread.get("body"))
+            expect(@view.showView.convertMath).toHaveBeenCalled()
+            @view.showView.convertMath.reset()
+            @view.collapsePost()
+            expect(@view.$el.find(".post-body").text()).toEqual(@thread.get("abbreviatedBody"))
+            expect(@view.showView.convertMath).toHaveBeenCalled()

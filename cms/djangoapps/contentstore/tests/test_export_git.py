@@ -9,7 +9,6 @@ import subprocess
 from uuid import uuid4
 
 from django.conf import settings
-from django.core.urlresolvers import reverse
 from django.test.utils import override_settings
 from pymongo import MongoClient
 
@@ -17,7 +16,7 @@ from .utils import CourseTestCase
 import contentstore.git_export_utils as git_export_utils
 from xmodule.contentstore.django import _CONTENTSTORE
 from xmodule.modulestore.django import modulestore
-from contentstore.utils import get_modulestore
+from contentstore.utils import reverse_course_url
 
 TEST_DATA_CONTENTSTORE = copy.deepcopy(settings.CONTENTSTORE)
 TEST_DATA_CONTENTSTORE['DOC_STORE_CONFIG']['db'] = 'test_xcontent_%s' % uuid4().hex
@@ -34,12 +33,8 @@ class TestExportGit(CourseTestCase):
         Setup test course, user, and url.
         """
         super(TestExportGit, self).setUp()
-        self.course_module = modulestore().get_item(self.course.location)
-        self.test_url = reverse('export_git', kwargs={
-            'org': self.course.location.org,
-            'course': self.course.location.course,
-            'name': self.course.location.name,
-        })
+        self.course_module = modulestore().get_course(self.course.id)
+        self.test_url = reverse_course_url('export_git', self.course.id)
 
     def tearDown(self):
         MongoClient().drop_database(TEST_DATA_CONTENTSTORE['DOC_STORE_CONFIG']['db'])
@@ -71,7 +66,7 @@ class TestExportGit(CourseTestCase):
         Test failed course export response.
         """
         self.course_module.giturl = 'foobar'
-        get_modulestore(self.course_module.location).update_item(self.course_module)
+        modulestore().update_item(self.course_module, '**replace_user**')
 
         response = self.client.get('{}?action=push'.format(self.test_url))
         self.assertIn('Export Failed:', response.content)
@@ -81,7 +76,7 @@ class TestExportGit(CourseTestCase):
         Regression test for making sure errors are properly stringified
         """
         self.course_module.giturl = 'foobar'
-        get_modulestore(self.course_module.location).update_item(self.course_module)
+        modulestore().update_item(self.course_module, '**replace_user**')
 
         response = self.client.get('{}?action=push'.format(self.test_url))
         self.assertNotIn('django.utils.functional.__proxy__', response.content)
@@ -104,7 +99,7 @@ class TestExportGit(CourseTestCase):
 
         self.populate_course()
         self.course_module.giturl = 'file://{}'.format(bare_repo_dir)
-        get_modulestore(self.course_module.location).update_item(self.course_module)
+        modulestore().update_item(self.course_module, '**replace_user**')
 
         response = self.client.get('{}?action=push'.format(self.test_url))
         self.assertIn('Export Succeeded', response.content)

@@ -29,22 +29,22 @@
     <div class="sort-bar">
         <span class="sort-label" id="sort-label">${_("Sort by:")}</span>
         <ul role="radiogroup" aria-labelledby="sort-label">
-            <li><a href="#" role="radio" aria-checked="true" class="active" data-sort="date">${_("date")}</a></li>
+            <li><a href="#" role="radio" aria-checked="false" data-sort="date">${_("date")}</a></li>
             <li><a href="#" role="radio" aria-checked="false" data-sort="votes">${_("votes")}</a></li>
             <li><a href="#" role="radio" aria-checked="false" data-sort="comments">${_("comments")}</a></li>
         </ul>
-
 
         %if is_course_cohorted and is_moderator:
         <span class="group-filter-label cohort">${_("Show:")}</span>
             <select class="group-filter-select cohort-options cohort">
                 <option value="all">${_("View All")}</option>
                     %for c in cohorts:
-                        <option value="${c.id}">${_("View as {name}").format(name=c.name)}</option>
+                        <option value="${c['id']}">${_("View as {name}").format(name=c['name'])}</option>
                     %endfor
             </select>
         %endif
     </div>
+    <div class="search-alerts"></div>
     <div class="post-list-wrapper">
         <ul class="post-list">
         </ul>

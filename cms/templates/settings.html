@@ -1,11 +1,12 @@
 <%inherit file="base.html" />
+<%def name="online_help_token()"><% return "schedule" %></%def>
 <%block name="title">${_("Schedule &amp; Details Settings")}</%block>
 <%block name="bodyclass">is-signedin course schedule view-settings feature-upload</%block>
 
 <%namespace name='static' file='static_content.html'/>
 <%!
   from django.utils.translation import ugettext as _
-  from xmodule.modulestore.django import loc_mapper
+  from contentstore import utils
 %>
 
 <%block name="header_extras">
@@ -190,7 +191,7 @@ require(["domReady!", "jquery", "js/models/settings/course_details", "js/views/s
           <div class="notice notice-incontext notice-workflow">
             <h3 class="title">${_("These Dates Are Not Used When Promoting Your Course")}</h3>
             <div class="copy">
-              <p>${_('These dates impact <strong>when your courseware can be viewed</strong>, but they are <strong>not the dates shown on your course summary page</strong>.  To provide the course start and registration dates as shown on your course summary page, follow the instructions provided by your <abbr title="Program Manager">PM</abbr> or Conrad Warre <a rel="email" class="action action-email" href="mailto:conrad@edx.org">(conrad@edx.org)</a>.')}</p>
+              <p>${_('These dates impact <strong>when your courseware can be viewed</strong>, but they are <strong>not the dates shown on your course summary page</strong>.  To provide the course start and registration dates as shown on your course summary page, follow the instructions provided by your <abbr title="Program Manager">PM</abbr>.')}</p>
             </div>
           </div>
           % endif
@@ -305,9 +306,9 @@ require(["domReady!", "jquery", "js/models/settings/course_details", "js/views/s
      <div class="bit">
      % if context_course:
           <%
-            course_team_url = course_locator.url_reverse('course_team/', '')
-            grading_config_url = course_locator.url_reverse('settings/grading/')
-            advanced_config_url = course_locator.url_reverse('settings/advanced/')
+            course_team_url = utils.reverse_course_url('course_team_handler', context_course.id)
+            grading_config_url = utils.reverse_course_url('grading_handler', context_course.id)
+            advanced_config_url = utils.reverse_course_url('advanced_settings_handler', context_course.id)
           %>
         <h3 class="title-3">${_("Other Course Settings")}</h3>
         <nav class="nav-related">

@@ -17,6 +17,7 @@ define(["jquery", "underscore", "js/views/baseview", "xblock/runtime.v1"],
                 return $.ajax({
                     url: decodeURIComponent(xblockUrl) + "/" + view,
                     type: 'GET',
+                    cache: false,
                     headers: { Accept: 'application/json' },
                     success: function(fragment) {
                         self.handleXBlockFragment(fragment, options);
@@ -25,18 +26,23 @@ define(["jquery", "underscore", "js/views/baseview", "xblock/runtime.v1"],
             },
 
             handleXBlockFragment: function(fragment, options) {
-                var wrapper = this.$el,
+                var self = this,
+                    wrapper = this.$el,
                     xblockElement,
                     success = options ? options.success : null,
-                    xblock;
-                this.renderXBlockFragment(fragment, wrapper);
-                xblockElement = this.$('.xblock').first();
-                xblock = XBlock.initializeBlock(xblockElement);
-                this.xblock = xblock;
-                this.xblockReady(xblock);
-                if (success) {
-                    success(xblock);
-                }
+                    xblock,
+                    fragmentsRendered;
+
+                fragmentsRendered = this.renderXBlockFragment(fragment, wrapper);
+                fragmentsRendered.done(function() {
+                    xblockElement = self.$('.xblock').first();
+                    xblock = XBlock.initializeBlock(xblockElement);
+                    self.xblock = xblock;
+                    self.xblockReady(xblock);
+                    if (success) {
+                        success(xblock);
+                    }
+                });
             },
 
             /**
@@ -69,10 +75,21 @@ define(["jquery", "underscore", "js/views/baseview", "xblock/runtime.v1"],
                 if (!element) {
                     element = this.$el;
                 }
-                // First render the HTML as the scripts might depend upon it
-                element.html(html);
-                // Now asynchronously add the resources to the page
+
+                // Render the HTML first as the scripts might depend upon it, and then
+                // asynchronously add the resources to the page.
+                this.updateHtml(element, html);
                 return this.addXBlockFragmentResources(resources);
+            },
+
+            /**
+             * Updates an element to have the specified HTML. The default method sets the HTML
+             * as child content, but this can be overridden.
+             * @param element The element to be updated
+             * @param html The desired HTML.
+             */
+            updateHtml: function(element, html) {
+                element.html(html);
             },
 
             /**

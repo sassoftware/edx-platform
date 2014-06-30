@@ -33,7 +33,7 @@ You can create other pages for the grading policy, course slides, or any other p
 
 * A dynamic HTML calendar, using the template in :ref:`Code for Dynamic HTML Schedule`.
 
-* An instant hangout.  See :ref:`Using an Instant Hangout in Your Course` for more information.
+* An instant hangout.  See :ref:`Google Instant Hangout` for more information.
 
 See:
 
@@ -66,7 +66,7 @@ Add a Page
   .. image:: ../Images/pages_editor.png
    :alt: Image of the Page editor
 
-4. Enter text for your page. See :ref:`The User Interface` for more information about using the editor.
+4. Enter text for your page. See :ref:`Options for Editing HTML Components` for more information about using the editor.
 #. Click **Settings** to edit the **Display Name**. The display name is the name of the page visible to students in the course.
 #. Click **Save**. 
 
@@ -78,23 +78,23 @@ The new page is immediately available to students, if the course has started.
 Show or Hide the Course Wiki Page
 ************************************************
 
-By default, your course includes a Wiki. Students and course staff can use the Wiki to post content and comment on others' content.
+By default, your course includes a Wiki page. Students and course staff can use the Wiki to post content and comment on others' content.
 
-If you do not want to use the Wiki in your course, you can hide it.
+If you do not want to use the Wiki in your course, you can hide the page.
 
-The eye icon in the Wiki object indicates that the Wiki is visible in your course:
+The eye icon in the Wiki object indicates that the Wiki page is visible in your course:
 
 .. image:: ../Images/pages_wiki_on.png
  :alt: Image of the Pages page with the Wiki made visible
 
-Click the eye icon to hide the Wiki. The icon changes:
+Click the eye icon to hide the Wiki page. The icon changes:
 
 .. image:: ../Images/pages_wiki_off.png
  :alt: Image of the Pages page with the Wiki made visible
 
-Click it again to make the Wiki visible.
+Click it again to make the Wiki page visible.
 
-.. note:: Content remains in the Wiki when you hide it. For example, you could hide the Wiki during an exam. After the exam, you could make the Wiki visible again. The content that was previously posted will be available.
+.. note:: Content remains in the Wiki when you hide the page. For example, if a student bookmarks a Wiki topic, then you hide the Wiki page, the student can still use the bookmark to access that Wiki topic. All content that was previously posted in the Wiki remains available after you hide the Wiki page, and any students logged in to edX can access the content if they know the URL. 
 
 .. _Reorder Pages:
 

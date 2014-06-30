@@ -4,6 +4,11 @@ Specific overrides to the base prod settings to make development easier.
 
 from .aws import * # pylint: disable=wildcard-import, unused-wildcard-import
 
+# Don't use S3 in devstack, fall back to filesystem
+del DEFAULT_FILE_STORAGE
+MEDIA_ROOT = "/edx/var/edxapp/uploads"
+
+
 DEBUG = True
 USE_I18N = True
 TEMPLATE_DEBUG = True
@@ -25,6 +30,16 @@ for pkg_name in ['track.contexts', 'track.middleware', 'dd.dogapi']:
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 FEATURES['ENABLE_INSTRUCTOR_EMAIL'] = True     # Enable email for all Studio courses
 FEATURES['REQUIRE_COURSE_EMAIL_AUTH'] = False  # Give all courses email (don't require django-admin perms)
+
+
+########################## ANALYTICS TESTING ########################
+
+ANALYTICS_SERVER_URL = "http://127.0.0.1:9000/"
+ANALYTICS_API_KEY = ""
+
+ANALYTICS_DATA_URL = "http://127.0.0.1:8080"
+ANALYTICS_DATA_TOKEN = ""
+FEATURES['ENABLE_ANALYTICS_ACTIVE_COUNT'] = True
 
 
 ################################ DEBUG TOOLBAR ################################

@@ -37,6 +37,10 @@ define(["jquery", "underscore", "gettext", "js/views/modals/base_modal",
                 this.editOptions = options;
                 this.render();
                 this.show();
+
+                // Hide the action bar until we know which buttons we want
+                this.getActionBar().hide();
+
                 // Display the xblock after the modal is shown as there are some xblocks
                 // that depend upon being visible when they initialize, e.g. the problem xmodule.
                 this.displayXBlock();
@@ -60,7 +64,17 @@ define(["jquery", "underscore", "gettext", "js/views/modals/base_modal",
 
             onDisplayXBlock: function() {
                 var editorView = this.editorView,
-                    title = this.getTitle();
+                    title = this.getTitle(),
+                    xblock = editorView.xblock,
+                    runtime = xblock.runtime;
+
+                // Notify the runtime that the modal has been shown
+                if (runtime) {
+                    this.runtime = runtime;
+                    runtime.notify('modal-shown', this);
+                }
+
+                // Update the modal's header
                 if (editorView.hasCustomTabs()) {
                     // Hide the modal's header as the custom editor provides its own
                     this.$('.modal-header').hide();
@@ -74,17 +88,32 @@ define(["jquery", "underscore", "gettext", "js/views/modals/base_modal",
                         this.selectMode(editorView.mode);
                     }
                 }
+
+                // If the xblock is not using custom buttons then choose which buttons to show
+                if (!editorView.hasCustomButtons()) {
+                    // If the xblock does not support save then disable the save button
+                    if (!xblock.save) {
+                        this.disableSave();
+                    }
+                    this.getActionBar().show();
+                }
+
+                // Resize the modal to fit the window
                 this.resize();
             },
 
+            disableSave: function() {
+                var saveButton = this.getActionButton('save'),
+                    cancelButton = this.getActionButton('cancel');
+                saveButton.hide();
+                cancelButton.text(gettext('OK'));
+                cancelButton.addClass('action-primary');
+            },
+
             getTitle: function() {
-                var displayName = this.xblockElement.find('.xblock-header .header-details').text().trim();
-                // If not found, try the old unit page style rendering
+                var displayName = this.xblockInfo.get('display_name');
                 if (!displayName) {
-                    displayName = this.xblockElement.find('.component-header').text().trim();
-                    if (!displayName) {
-                        displayName = gettext('Component');
-                    }
+                    displayName = gettext('Component');
                 }
                 return interpolate(gettext("Editing: %(title)s"), { title: displayName }, true);
             },
@@ -99,6 +128,7 @@ define(["jquery", "underscore", "gettext", "js/views/modals/base_modal",
             },
 
             changeMode: function(event) {
+                this.removeCheatsheetVisibility();
                 var parent = $(event.target.parentElement),
                     mode = parent.data('mode');
                 event.preventDefault();
@@ -117,36 +147,45 @@ define(["jquery", "underscore", "gettext", "js/views/modals/base_modal",
             },
 
             save: function(event) {
-                var self = this,
-                    xblockInfo = this.xblockInfo,
-                    refresh = self.editOptions.refresh;
                 event.preventDefault();
                 this.editorView.save({
-                    success: function() {
-                        self.hide();
-                        if (refresh) {
-                            refresh(xblockInfo);
-                        }
-                    }
+                    success: _.bind(this.onSave, this)
                 });
+            },
+
+            onSave: function() {
+                var refresh = this.editOptions.refresh;
+                this.hide();
+                if (refresh) {
+                    refresh(this.xblockInfo);
+                }
             },
 
             hide: function() {
                 BaseModal.prototype.hide.call(this);
 
-                // Completely clear the contents of the modal
-                this.undelegateEvents();
-                this.$el.html("");
+                // Notify the runtime that the modal has been hidden
+                if (this.runtime) {
+                    this.runtime.notify('modal-hidden');
+                }
             },
 
             findXBlockInfo: function(xblockWrapperElement, defaultXBlockInfo) {
                 var xblockInfo = defaultXBlockInfo,
-                    xblockElement;
+                    xblockElement,
+                    displayName;
                 if (xblockWrapperElement.length > 0) {
                     xblockElement = xblockWrapperElement.find('.xblock');
+                    displayName = xblockWrapperElement.find('.xblock-header .header-details .xblock-display-name').text().trim();
+                    // If not found, try looking for the old unit page style rendering
+                    if (!displayName) {
+                        displayName = this.xblockElement.find('.component-header').text().trim();
+                    }
                     xblockInfo = new XBlockInfo({
                         id: xblockWrapperElement.data('locator'),
-                        category: xblockElement.data('block-type')
+                        courseKey: xblockWrapperElement.data('course-key'),
+                        category: xblockElement.data('block-type'),
+                        display_name: displayName
                     });
                 }
                 return xblockInfo;
@@ -158,6 +197,17 @@ define(["jquery", "underscore", "gettext", "js/views/modals/base_modal",
                     mode: mode,
                     displayName: displayName
                 }));
+            },
+
+            removeCheatsheetVisibility: function() {
+                var cheatsheet = $('article.simple-editor-open-ended-cheatsheet');
+                if (cheatsheet.length === 0) {
+                    cheatsheet = $('article.simple-editor-cheatsheet');
+                }
+                if (cheatsheet.hasClass('shown')) {
+                    cheatsheet.removeClass('shown');
+                    $('.modal-content').removeClass('cheatsheet-is-shown');
+                }
             }
         });
 

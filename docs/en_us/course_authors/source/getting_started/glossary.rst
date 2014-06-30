@@ -135,7 +135,7 @@ C
  
 **Custom Response Problem**
 
-  A custom response problem evaluates text responses from students using an embedded Python script. These problems are also called "write-your-own-grader" problems. For more information, see :ref:`Custom Python Evaluated Input` Custom Python-evaluated input (also called "write-your-own-grader" problems evaluate students'.
+  A custom response problem evaluates text responses from students using an embedded Python script. These problems are also called "write-your-own-grader" problems. For more information, see :ref:`Write Your Own Grader`. 
 
 .. _D:
 
@@ -249,14 +249,6 @@ H
   See :ref:`Working with HTML Components` for more information.
 
 
-.. _HTML View:
- 
-**HTML View**
-
-  The view in the HTML component editor allows you to enter HTML code directly.
-
-  See :ref:`The User Interface` for more information.
-
 
 .. _I:
 
@@ -332,7 +324,7 @@ M
 
   A problem that requires students to enter a mathematical expression as text, such as e=m*c^2.
 
-  See :ref:`Math Expression Syntax` for more information.
+  See :ref:`Math Response Formatting for Students` for more information.
 
 
 .. _MathJax:
@@ -470,7 +462,7 @@ S
  
 **Simple Editor**
 
-  The graphical user interface in a Problem component that contains formatting buttons and is available for some problem types. For more information, see :ref:`Studio UI`.
+  The graphical user interface in a Problem component that contains formatting buttons and is available for some problem types. For more information, see :ref:`Problem Studio View`.
 
 
 
@@ -530,15 +522,6 @@ V
   A component that you can use to add recorded videos to your course. 
 
   See :ref:`Working with Video Components` for more information.
-
-
-.. _Visual View:
- 
-**Visual View**
-
-  The view in the HTML component editor that allows you format text without using HTML code.
-
-  See :ref:`The User Interface` for more information.
 
 
 .. _W:

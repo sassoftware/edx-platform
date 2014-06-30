@@ -17,13 +17,24 @@ function (HTML5Video, Resizer) {
         methodsDict = {
             duration: duration,
             handlePlaybackQualityChange: handlePlaybackQualityChange,
+
+            // Added for finer graded seeking control.
+            // Please see:
+            //     https://developers.google.com/youtube/js_api_reference#Events
+            isBuffering: isBuffering,
+            // https://developers.google.com/youtube/js_api_reference#cueVideoById
+            isCued: isCued,
+
             isEnded: isEnded,
             isPlaying: isPlaying,
+            isUnstarted: isUnstarted,
             log: log,
             onCaptionSeek: onSeek,
             onEnded: onEnded,
             onPause: onPause,
             onPlay: onPlay,
+            runTimer: runTimer,
+            stopTimer: stopTimer,
             onPlaybackQualityChange: onPlaybackQualityChange,
             onReady: onReady,
             onSlideSeek: onSeek,
@@ -33,6 +44,7 @@ function (HTML5Video, Resizer) {
             onVolumeChange: onVolumeChange,
             pause: pause,
             play: play,
+            seekTo: seekTo,
             setPlaybackRate: setPlaybackRate,
             update: update,
             figureOutStartEndTime: figureOutStartEndTime,
@@ -54,7 +66,17 @@ function (HTML5Video, Resizer) {
     //     Functions which will be accessible via 'state' object. When called,
     //     these functions will get the 'state' object as a context.
     function _makeFunctionsPublic(state) {
+        var debouncedF = _.debounce(
+            function (params) {
+                return onSeek.call(this, params);
+            }.bind(state),
+            300
+        );
+
         state.bindTo(methodsDict, state.videoPlayer, state);
+
+        state.videoPlayer.onSlideSeek = debouncedF;
+        state.videoPlayer.onCaptionSeek = debouncedF;
     }
 
     // function _initialize(state)
@@ -73,16 +95,15 @@ function (HTML5Video, Resizer) {
         state.videoPlayer.ready = _.once(function () {
             $(window).on('unload', state.saveState);
 
-            if (!state.isFlashMode()) {
+            if (!state.isFlashMode() && state.speed != '1.0') {
                 state.videoPlayer.setPlaybackRate(state.speed);
             }
-            state.videoPlayer.player.setVolume(state.currentVolume);
         });
 
-        if (state.videoType === 'youtube') {
+        if (state.isYoutubeType()) {
             state.videoPlayer.PlayerState = YT.PlayerState;
             state.videoPlayer.PlayerState.UNSTARTED = -1;
-        } else { // if (state.videoType === 'html5') {
+        } else {
             state.videoPlayer.PlayerState = HTML5Video.PlayerState;
         }
 
@@ -121,7 +142,7 @@ function (HTML5Video, Resizer) {
         if (state.videoType === 'html5') {
             state.videoPlayer.player = new HTML5Video.Player(state.el, {
                 playerVars:   state.videoPlayer.playerVars,
-                videoSources: state.html5Sources,
+                videoSources: state.config.sources,
                 events: {
                     onReady:       state.videoPlayer.onReady,
                     onStateChange: state.videoPlayer.onStateChange
@@ -139,7 +160,7 @@ function (HTML5Video, Resizer) {
                 _updateVcrAndRegion(state);
             }, false);
 
-        } else { // if (state.videoType === 'youtube') {
+        } else {
             youTubeId = state.youtubeId();
 
             state.videoPlayer.player = new YT.Player(state.id, {
@@ -305,8 +326,8 @@ function (HTML5Video, Resizer) {
     // This function gets the video's current play position in time
     // (currentTime) and its duration.
     // It is called at a regular interval when the video is playing.
-    function update() {
-        this.videoPlayer.currentTime = this.videoPlayer.player.getCurrentTime();
+    function update(time) {
+        this.videoPlayer.currentTime = time || this.videoPlayer.player.getCurrentTime();
 
         if (isFinite(this.videoPlayer.currentTime)) {
             this.videoPlayer.updatePlayTime(this.videoPlayer.currentTime);
@@ -331,7 +352,8 @@ function (HTML5Video, Resizer) {
     }
 
     function setPlaybackRate(newSpeed) {
-        var time = this.videoPlayer.currentTime,
+        var duration = this.videoPlayer.duration(),
+            time = this.videoPlayer.currentTime,
             methodName, youtubeId;
 
         if (
@@ -339,7 +361,7 @@ function (HTML5Video, Resizer) {
             !(
                 this.browserIsFirefox &&
                 newSpeed === '1.0' &&
-                this.videoType === 'youtube'
+                this.isYoutubeType()
             )
         ) {
             this.videoPlayer.player.setPlaybackRate(newSpeed);
@@ -357,7 +379,22 @@ function (HTML5Video, Resizer) {
             }
 
             this.videoPlayer.player[methodName](youtubeId, time);
+
+            // We need to call play() explicitly because after the call
+            // to functions cueVideoById() followed by seekTo() the video
+            // is in a PAUSED state.
+            //
+            // Why? This is how the YouTube API is implemented.
             this.videoPlayer.updatePlayTime(time);
+            if (time > 0 && this.isFlashMode()) {
+                this.videoPlayer.seekTo(time);
+                this.trigger(
+                    'videoProgressSlider.updateStartEndTimeRegion',
+                    {
+                        duration: duration
+                    }
+                );
+            }
         }
     }
 
@@ -393,53 +430,88 @@ function (HTML5Video, Resizer) {
     // It is created on a onPlay event. Cleared on a onPause event.
     // Reinitialized on a onSeek event.
     function onSeek(params) {
-        var duration = this.videoPlayer.duration(),
-            newTime = params.time;
-
-        if (
-            (typeof newTime !== 'number') ||
-            (newTime > duration) ||
-            (newTime < 0)
-        ) {
-            return;
-        }
-
-        this.videoPlayer.log(
-            'seek_video',
-            {
-                old_time: this.videoPlayer.currentTime,
-                new_time: newTime,
-                type: params.type
-            }
-        );
+        var time = params.time,
+            type = params.type,
+            oldTime = this.videoPlayer.currentTime;
 
         // After the user seeks, the video will start playing from
         // the sought point, and stop playing at the end.
         this.videoPlayer.goToStartTime = false;
-        if (newTime > this.videoPlayer.endTime || this.videoPlayer.endTime === null) {
+        if (time > this.videoPlayer.endTime || this.videoPlayer.endTime === null) {
             this.videoPlayer.stopAtEndTime = false;
         }
 
-        this.videoPlayer.player.seekTo(newTime, true);
+        this.videoPlayer.seekTo(time);
+        this.videoPlayer.log(
+            'seek_video',
+            {
+                old_time: oldTime,
+                new_time: time,
+                type: type
+            }
+        );
+    }
+
+    function seekTo(time) {
+        var duration = this.videoPlayer.duration();
+
+        if ((typeof time !== 'number') || (time > duration) || (time < 0)) {
+            return false;
+        }
+
+        this.el.off('play.seek');
 
         if (this.videoPlayer.isPlaying()) {
-            clearInterval(this.videoPlayer.updateInterval);
-            this.videoPlayer.updateInterval = setInterval(
+            this.videoPlayer.stopTimer();
+        } else {
+            this.videoPlayer.currentTime = time;
+        }
+        var isUnplayed = this.videoPlayer.isUnstarted() ||
+                         this.videoPlayer.isCued();
+
+        // Use `cueVideoById` method for youtube video that is not played before.
+        if (isUnplayed && this.isYoutubeType()) {
+            this.videoPlayer.player.cueVideoById(this.youtubeId(), time);
+        } else {
+            // Youtube video cannot be rewinded during bufferization, so wait to
+            // finish bufferization and then rewind the video.
+            if (this.isYoutubeType() && this.videoPlayer.isBuffering()) {
+                this.el.on('play.seek', function () {
+                    this.videoPlayer.player.seekTo(time, true);
+                }.bind(this));
+            } else {
+                // Otherwise, just seek the video
+                this.videoPlayer.player.seekTo(time, true);
+            }
+        }
+
+        this.videoPlayer.updatePlayTime(time, true);
+        this.el.trigger('seek', arguments);
+    }
+
+    function runTimer() {
+        if (!this.videoPlayer.updateInterval) {
+            this.videoPlayer.updateInterval = window.setInterval(
                 this.videoPlayer.update, 200
             );
 
-            setTimeout(this.videoPlayer.update, 0);
-        } else {
-            this.videoPlayer.currentTime = newTime;
+            this.videoPlayer.update();
         }
+    }
 
-        this.videoPlayer.updatePlayTime(newTime);
-
-        this.el.trigger('seek', arguments);
+    function stopTimer() {
+        window.clearInterval(this.videoPlayer.updateInterval);
+        delete this.videoPlayer.updateInterval;
     }
 
     function onEnded() {
         var time = this.videoPlayer.duration();
+        this.videoPlayer.log(
+            'stop_video',
+            {
+                currentTime: this.videoPlayer.currentTime
+            }
+        );
 
         this.trigger('videoControl.pause', null);
         this.trigger('videoProgressSlider.notifyThroughHandleEnd', {
@@ -466,8 +538,7 @@ function (HTML5Video, Resizer) {
             }
         );
 
-        clearInterval(this.videoPlayer.updateInterval);
-        delete this.videoPlayer.updateInterval;
+        this.videoPlayer.stopTimer();
 
         this.trigger('videoControl.pause', null);
         this.saveState(true);
@@ -482,14 +553,7 @@ function (HTML5Video, Resizer) {
             }
         );
 
-        if (!this.videoPlayer.updateInterval) {
-            this.videoPlayer.updateInterval = setInterval(
-                this.videoPlayer.update, 200
-            );
-
-            this.videoPlayer.update();
-        }
-
+        this.videoPlayer.runTimer();
         this.trigger('videoControl.play', null);
         this.trigger('videoProgressSlider.notifyThroughHandleEnd', {
             end: false
@@ -525,6 +589,10 @@ function (HTML5Video, Resizer) {
             _this.videoPlayer.onSpeedChange(speed);
         });
 
+        this.el.on('volumechange volumechange:silent', function (event, volume) {
+            _this.videoPlayer.onVolumeChange(volume);
+        });
+
         this.videoPlayer.log('load_video');
 
         availablePlaybackRates = this.videoPlayer.player
@@ -558,7 +626,7 @@ function (HTML5Video, Resizer) {
         //     https://github.com/edx/edx-platform/pull/2841
         if (
             (this.isHtml5Mode() || availablePlaybackRates.length > 1) &&
-            this.videoType === 'youtube'
+            this.isYoutubeType()
         ) {
             if (availablePlaybackRates.length === 1 && !this.isTouch) {
                 // This condition is needed in cases when Firefox version is
@@ -570,6 +638,7 @@ function (HTML5Video, Resizer) {
                 // have 1 speed available, we fall back to Flash.
 
                 _restartUsingFlash(this);
+                return false;
             } else if (availablePlaybackRates.length > 1) {
                 this.setPlayerMode('html5');
 
@@ -607,40 +676,49 @@ function (HTML5Video, Resizer) {
             this.videoPlayer.player.setPlaybackRate(this.speed);
         }
 
-        this.el.trigger('ready', arguments);
-        /* The following has been commented out to make sure autoplay is
-           disabled for students.
-        if (
-            !this.isTouch &&
-            $('.video:first').data('autoplay') === 'True'
-        ) {
-            this.videoPlayer.play();
+
+        var duration = this.videoPlayer.duration(),
+            time = this.videoPlayer.figureOutStartingTime(duration);
+
+        if (time > 0 && this.videoPlayer.goToStartTime) {
+            this.videoPlayer.seekTo(time);
         }
-        */
+
+        this.el.trigger('ready', arguments);
     }
 
     function onStateChange(event) {
+        this.el.removeClass([
+            'is-unstarted', 'is-playing', 'is-paused', 'is-buffered',
+            'is-ended', 'is-cued'
+        ].join(' '));
+
         switch (event.data) {
             case this.videoPlayer.PlayerState.UNSTARTED:
+                this.el.addClass('is-unstarted');
                 this.videoPlayer.onUnstarted();
                 break;
             case this.videoPlayer.PlayerState.PLAYING:
+                this.el.addClass('is-playing');
                 this.videoPlayer.onPlay();
                 break;
             case this.videoPlayer.PlayerState.PAUSED:
+                this.el.addClass('is-paused');
                 this.videoPlayer.onPause();
                 break;
+            case this.videoPlayer.PlayerState.BUFFERING:
+                this.el.addClass('is-buffered');
+                this.el.trigger('buffering');
+                break;
             case this.videoPlayer.PlayerState.ENDED:
+                this.el.addClass('is-ended');
                 this.videoPlayer.onEnded();
                 break;
             case this.videoPlayer.PlayerState.CUED:
-                this.videoPlayer.player.seekTo(this.videoPlayer.seekToTimeOnCued, true);
-                // We need to call play() explicitly because after the call
-                // to functions cueVideoById() followed by seekTo() the video
-                // is in a PAUSED state.
-                //
-                // Why? This is how the YouTube API is implemented.
-                this.videoPlayer.play();
+                this.el.addClass('is-cued');
+                if (this.isFlashMode()) {
+                    this.videoPlayer.play();
+                }
                 break;
         }
     }
@@ -711,61 +789,10 @@ function (HTML5Video, Resizer) {
         return time;
     }
 
-    function updatePlayTime(time) {
+    function updatePlayTime(time, skip_seek) {
         var videoPlayer = this.videoPlayer,
             duration = this.videoPlayer.duration(),
             youTubeId;
-
-        if (duration > 0 && videoPlayer.goToStartTime) {
-            videoPlayer.goToStartTime = false;
-
-            // The duration might have changed. Update the start-end time region to
-            // reflect this fact.
-            this.trigger(
-                'videoProgressSlider.updateStartEndTimeRegion',
-                {
-                    duration: duration
-                }
-            );
-
-            time = videoPlayer.figureOutStartingTime(duration);
-
-            // When the video finishes playing, we will start from the
-            // start-time, or from the beginning (rather than from the remembered
-            // position).
-            this.config.savedVideoPosition = 0;
-
-            if (time > 0) {
-                // After a bug came up (BLD-708: "In Firefox YouTube video with
-                // start-time plays from 00:00:00") the video refused to play
-                // from start-time, and only played from the beginning.
-                //
-                // It turned out that for some reason if Firefox you couldn't
-                // seek beyond some amount of time before the video loaded.
-                // Very strange, but in Chrome there is no such bug.
-                //
-                // HTML5 video sources play fine from start-time in both Chrome
-                // and Firefox.
-                if (this.browserIsFirefox && this.videoType === 'youtube') {
-                    youTubeId = this.youtubeId();
-
-                    // When we will call cueVideoById() for some strange reason
-                    // an ENDED event will be fired. It really does no damage
-                    // except for the fact that the end-time is reset to null.
-                    // We do not want this.
-                    //
-                    // The flag `skipOnEndedStartEndReset` will notify the
-                    // onEnded() callback for the ENDED event that there
-                    // is no need in resetting the start-time and end-time.
-                    videoPlayer.skipOnEndedStartEndReset = true;
-
-                    videoPlayer.seekToTimeOnCued = time;
-                    videoPlayer.player.cueVideoById(youTubeId, time);
-                } else {
-                    videoPlayer.player.seekTo(time);
-                }
-            }
-        }
 
         this.trigger(
             'videoProgressSlider.updatePlayTime',
@@ -794,10 +821,27 @@ function (HTML5Video, Resizer) {
     }
 
     function isPlaying() {
-        var playerState = this.videoPlayer.player.getPlayerState(),
-            PLAYING = this.videoPlayer.PlayerState.PLAYING;
+        var playerState = this.videoPlayer.player.getPlayerState();
 
-        return playerState === PLAYING;
+        return playerState === this.videoPlayer.PlayerState.PLAYING;
+    }
+
+    function isBuffering() {
+        var playerState = this.videoPlayer.player.getPlayerState();
+
+        return playerState === this.videoPlayer.PlayerState.BUFFERING;
+    }
+
+    function isCued() {
+        var playerState = this.videoPlayer.player.getPlayerState();
+
+        return playerState === this.videoPlayer.PlayerState.CUED;
+    }
+
+    function isUnstarted() {
+        var playerState = this.videoPlayer.player.getPlayerState();
+
+        return playerState === this.videoPlayer.PlayerState.UNSTARTED;
     }
 
     /*
@@ -844,7 +888,7 @@ function (HTML5Video, Resizer) {
         // might differ by one or two seconds against the actual time as will
         // be reported later on by the player.getDuration() API function.
         if (!isFinite(dur) || dur <= 0) {
-            if (this.videoType === 'youtube') {
+            if (this.isYoutubeType()) {
                 dur = this.getDuration();
             }
         }
@@ -873,9 +917,9 @@ function (HTML5Video, Resizer) {
             });
         }
 
-        if (this.videoType === 'youtube') {
+        if (this.isYoutubeType()) {
             logInfo.code = this.youtubeId();
-        } else  if (this.videoType === 'html5') {
+        } else {
             logInfo.code = 'html5';
         }
 
@@ -884,7 +928,6 @@ function (HTML5Video, Resizer) {
 
     function onVolumeChange(volume) {
         this.videoPlayer.player.setVolume(volume);
-        this.el.trigger('volumechange', arguments);
     }
 });
 

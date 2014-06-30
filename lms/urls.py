@@ -5,6 +5,8 @@ from django.conf.urls.static import static
 
 import django.contrib.auth.views
 
+from microsite_configuration import microsite
+
 # Uncomment the next two lines to enable the admin:
 if settings.DEBUG or settings.FEATURES.get('ENABLE_DJANGO_ADMIN_SITE'):
     admin.autodiscover()
@@ -12,9 +14,9 @@ if settings.DEBUG or settings.FEATURES.get('ENABLE_DJANGO_ADMIN_SITE'):
 urlpatterns = ('',  # nopep8
     # certificate view
     url(r'^update_certificate$', 'certificates.views.update_certificate'),
+    url(r'^request_certificate$', 'certificates.views.request_certificate'),
     url(r'^$', 'branding.views.index', name="root"),   # Main marketing page, or redirect to courseware
     url(r'^dashboard$', 'student.views.dashboard', name="dashboard"),
-    url(r'^token$', 'student.views.token', name="token"),
     url(r'^login$', 'student.views.signin_user', name="signin_user"),
     url(r'^register$', 'student.views.register_user', name="register_user"),
 
@@ -67,6 +69,9 @@ urlpatterns = ('',  # nopep8
     url(r'^i18n/', include('django.conf.urls.i18n')),
 
     url(r'^embargo$', 'student.views.embargo', name="embargo"),
+
+    # Feedback Form endpoint
+    url(r'^submit_feedback$', 'util.views.submit_feedback'),
 )
 
 # if settings.FEATURES.get("MULTIPLE_ENROLLMENT_ROLES"):
@@ -78,8 +83,8 @@ urlpatterns += (
 
 js_info_dict = {
     'domain': 'djangojs',
-    # No packages needed, we get LOCALE_PATHS anyway.
-    'packages': (),
+    # We need to explicitly include external Django apps that are not in LOCALE_PATHS.
+    'packages': ('openassessment',),
 }
 
 urlpatterns += (
@@ -93,11 +98,23 @@ if settings.FEATURES["ENABLE_SYSADMIN_DASHBOARD"]:
         url(r'^sysadmin/', include('dashboard.sysadmin_urls')),
     )
 
+urlpatterns += (
+    url(r'support/', include('dashboard.support_urls')),
+)
+
 #Semi-static views (these need to be rendered and have the login bar, but don't change)
 urlpatterns += (
     url(r'^404$', 'static_template_view.views.render',
         {'template': '404.html'}, name="404"),
 )
+
+# Favicon
+favicon_path = microsite.get_value('favicon_path', settings.FAVICON_PATH)
+urlpatterns += ((
+    r'^favicon\.ico$',
+    'django.views.generic.simple.redirect_to',
+    {'url':  settings.STATIC_URL + favicon_path}
+),)
 
 # Semi-static views only used by edX, not by themes
 if not settings.FEATURES["USE_CUSTOM_THEME"]:
@@ -118,13 +135,7 @@ if not settings.FEATURES["USE_CUSTOM_THEME"]:
 
         # Press releases
         url(r'^press/([_a-zA-Z0-9-]+)$', 'static_template_view.views.render_press_release', name='press_release'),
-
-        # Favicon
-        (r'^favicon\.ico$', 'django.views.generic.simple.redirect_to', {'url': '/static/images/favicon.ico'}),
-
-        url(r'^submit_feedback$', 'util.views.submit_feedback'),
-
-    )
+)
 
 # Only enable URLs for those marketing links actually enabled in the
 # settings. Disable URLs by marking them as None.
@@ -148,7 +159,7 @@ for key, value in settings.MKTG_URL_LINK_MAP.items():
 
     # Make the assumption that the URL we want is the lowercased
     # version of the map key
-    urlpatterns += (url(r'^%s' % key.lower(),
+    urlpatterns += (url(r'^%s$' % key.lower(),
                         'static_template_view.views.render',
                         {'template': template}, name=value),)
 
@@ -222,7 +233,7 @@ if settings.COURSEWARE_ENABLED:
         url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/mktg-about$',
             'courseware.views.mktg_course_about', name="mktg_about_course"),
         #View for mktg site
-        url(r'^mktg/(?P<course_id>.*)$',
+        url(r'^mktg/(?P<course_id>[^/]+/[^/]+/[^/]+)/?$',
             'courseware.views.mktg_course_about', name="mktg_about_course"),
 
         #Inside the course
@@ -270,14 +281,13 @@ if settings.COURSEWARE_ENABLED:
 
         # For the instructor
         url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/instructor$',
-            'instructor.views.legacy.instructor_dashboard', name="instructor_dashboard"),
+            'instructor.views.instructor_dashboard.instructor_dashboard_2', name="instructor_dashboard"),
+        url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/instructor/api/',
+            include('instructor.views.api_urls')),
 
-        # see ENABLE_INSTRUCTOR_BETA_DASHBOARD section for more urls
+        # see ENABLE_INSTRUCTOR_LEGACY_DASHBOARD section for legacy dash urls
 
-        url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/gradebook$',
-            'instructor.views.legacy.gradebook', name='gradebook'),
-        url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/grade_summary$',
-            'instructor.views.legacy.grade_summary', name='grade_summary'),
+        # Open Ended grading views
         url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/staff_grading$',
             'open_ended_grading.views.staff_grading', name='staff_grading'),
         url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/staff_grading/get_next$',
@@ -298,21 +308,21 @@ if settings.COURSEWARE_ENABLED:
             'open_ended_grading.views.take_action_on_flags', name='open_ended_flagged_problems_take_action'),
 
         # Cohorts management
-        url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/cohorts$',
+        url(r'^courses/(?P<course_key>[^/]+/[^/]+/[^/]+)/cohorts$',
             'course_groups.views.list_cohorts', name="cohorts"),
-        url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/cohorts/add$',
+        url(r'^courses/(?P<course_key>[^/]+/[^/]+/[^/]+)/cohorts/add$',
             'course_groups.views.add_cohort',
             name="add_cohort"),
-        url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/cohorts/(?P<cohort_id>[0-9]+)$',
+        url(r'^courses/(?P<course_key>[^/]+/[^/]+/[^/]+)/cohorts/(?P<cohort_id>[0-9]+)$',
             'course_groups.views.users_in_cohort',
             name="list_cohort"),
-        url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/cohorts/(?P<cohort_id>[0-9]+)/add$',
+        url(r'^courses/(?P<course_key>[^/]+/[^/]+/[^/]+)/cohorts/(?P<cohort_id>[0-9]+)/add$',
             'course_groups.views.add_users_to_cohort',
             name="add_to_cohort"),
-        url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/cohorts/(?P<cohort_id>[0-9]+)/delete$',
+        url(r'^courses/(?P<course_key>[^/]+/[^/]+/[^/]+)/cohorts/(?P<cohort_id>[0-9]+)/delete$',
             'course_groups.views.remove_user_from_cohort',
             name="remove_from_cohort"),
-        url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/cohorts/debug$',
+        url(r'^courses/(?P<course_key>[^/]+/[^/]+/[^/]+)/cohorts/debug$',
             'course_groups.views.debug_cohort_mgmt',
             name="debug_cohort_mgmt"),
 
@@ -326,6 +336,9 @@ if settings.COURSEWARE_ENABLED:
         url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/notes$', 'notes.views.notes', name='notes'),
         url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/notes/', include('notes.urls')),
 
+        # LTI endpoints listing
+        url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/lti_rest_endpoints/',
+            'courseware.views.get_course_lti_endpoints', name='lti_rest_endpoints'),
     )
 
     # allow course staff to change to student view of courseware
@@ -350,7 +363,7 @@ if settings.COURSEWARE_ENABLED:
     urlpatterns += (
         # This MUST be the last view in the courseware--it's a catch-all for custom tabs.
         url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/(?P<tab_slug>[^/]+)/$',
-        'courseware.views.static_tab', name="static_tab"),
+            'courseware.views.static_tab', name="static_tab"),
     )
 
     if settings.FEATURES.get('ENABLE_STUDENT_HISTORY_VIEW'):
@@ -361,34 +374,17 @@ if settings.COURSEWARE_ENABLED:
         )
 
 
-if settings.COURSEWARE_ENABLED and settings.FEATURES.get('ENABLE_INSTRUCTOR_BETA_DASHBOARD'):
+if settings.COURSEWARE_ENABLED and settings.FEATURES.get('ENABLE_INSTRUCTOR_LEGACY_DASHBOARD'):
     urlpatterns += (
-        url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/instructor_dashboard$',
-            'instructor.views.instructor_dashboard.instructor_dashboard_2', name="instructor_dashboard_2"),
-
-        url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/instructor_dashboard/api/',
-            include('instructor.views.api_urls'))
+        url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/legacy_grade_summary$',
+            'instructor.views.legacy.grade_summary', name='grade_summary_legacy'),
+        url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/legacy_instructor_dash$',
+            'instructor.views.legacy.instructor_dashboard', name="instructor_dashboard_legacy"),
     )
 
 if settings.FEATURES.get('CLASS_DASHBOARD'):
     urlpatterns += (
-        # Json request data for metrics for entire course
-        url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/all_sequential_open_distrib$',
-            'class_dashboard.views.all_sequential_open_distrib', name="all_sequential_open_distrib"),
-        url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/all_problem_grade_distribution$',
-            'class_dashboard.views.all_problem_grade_distribution', name="all_problem_grade_distribution"),
-
-        # Json request data for metrics for particular section
-        url(r'^courses/(?P<course_id>[^/]+/[^/]+/[^/]+)/problem_grade_distribution/(?P<section>\d+)$',
-            'class_dashboard.views.section_problem_grade_distrib', name="section_problem_grade_distrib"),
-
-        # For listing students that opened a sub-section
-        url(r'^get_students_opened_subsection$',
-            'class_dashboard.dashboard_data.get_students_opened_subsection', name="get_students_opened_subsection"),
-
-        # For listing of students' grade per problem
-        url(r'^get_students_problem_grades$',
-            'class_dashboard.dashboard_data.get_students_problem_grades', name="get_students_problem_grades"),
+        url(r'^class_dashboard/', include('class_dashboard.urls')),
     )
 
 if settings.DEBUG or settings.FEATURES.get('ENABLE_DJANGO_ADMIN_SITE'):

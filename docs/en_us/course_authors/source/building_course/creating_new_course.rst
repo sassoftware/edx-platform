@@ -20,7 +20,7 @@ You can also :ref:`Export a Course` and :ref:`Import a Course` through Studio.
 You can do this when you need to edit the course in XML.
 
 .. _Edge: http://edge.edx.org
-.. _edX.org: http://edx.org
+.. _edXorg: http://edx.org
 
 .. _Create a New Course:
   
@@ -40,7 +40,7 @@ Create a New Course
    created, you must contact edX through the Help site
    (http://help.edge.edx.org). Additionally, because this information becomes
    part of your course URL, the total number of characters in the following
-   three fields must be 65 or fewer.
+   four fields must be 65 or fewer.
 
   * For **Course Name**, enter the title of your course. For example, the name
     may be “Sets, Maps and Symmetry Groups". Use title capitalization for the
@@ -142,3 +142,8 @@ To add a course team member:
 #. Click **Add a New Team Member**.
 #. Enter the new team member's email address, then click **ADD USER**.
 
+You can also assign privileged roles to users when you work in the LMS.
+Regardless of where the role is assigned, these administrative team members can
+work on your course in both the LMS and in Studio. For more information on
+assigning roles while you run your course, see
+:ref:`Course_Staffing`.
