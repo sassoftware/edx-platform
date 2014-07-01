@@ -194,6 +194,9 @@ MIDDLEWARE_CLASSES = (
     'django.contrib.sessions.middleware.SessionMiddleware',
     'method_override.middleware.MethodOverrideMiddleware',
 
+    # Reverse proxy
+    'x_forwarded_for.middleware.XForwardedForMiddleware',
+
     # Instead of AuthenticationMiddleware, we use a cache-backed version
     'cache_toolbox.middleware.CacheBackedAuthenticationMiddleware',
     'student.middleware.UserStandingMiddleware',
@@ -301,7 +304,7 @@ EMBARGO_SITE_REDIRECT_URL = None
 
 ############################### Pipeline #######################################
 
-STATICFILES_STORAGE = 'pipeline.storage.PipelineCachedStorage'
+STATICFILES_STORAGE = 'pipeline.storage.PipelineStorage'
 
 from rooted_paths import rooted_glob
 
@@ -527,6 +530,9 @@ INSTALLED_APPS = (
 
     # Monitoring signals
     'monitoring',
+
+    # Reverse proxy
+    'x_forwarded_for',
 )
 
 

@@ -766,6 +766,9 @@ MIDDLEWARE_CLASSES = (
     'django.middleware.common.CommonMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
 
+    # Reverse proxy
+    'x_forwarded_for.middleware.XForwardedForMiddleware',
+
     # Instead of AuthenticationMiddleware, we use a cached backed version
     #'django.contrib.auth.middleware.AuthenticationMiddleware',
     'cache_toolbox.middleware.CacheBackedAuthenticationMiddleware',
@@ -822,7 +825,7 @@ X_FRAME_OPTIONS = 'ALLOW'
 
 ############################### Pipeline #######################################
 
-STATICFILES_STORAGE = 'pipeline.storage.PipelineCachedStorage'
+STATICFILES_STORAGE = 'pipeline.storage.PipelineStorage'
 
 from rooted_paths import rooted_glob
 
@@ -1265,6 +1268,9 @@ INSTALLED_APPS = (
 
     # Monitoring functionality
     'monitoring',
+
+    # Reverse proxy
+    'x_forwarded_for',
 )
 
 ######################### MARKETING SITE ###############################
