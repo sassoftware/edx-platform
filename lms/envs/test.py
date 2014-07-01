@@ -33,9 +33,11 @@ FEATURES['ENABLE_SERVICE_STATUS'] = True
 
 FEATURES['ENABLE_HINTER_INSTRUCTOR_VIEW'] = True
 
-FEATURES['ENABLE_INSTRUCTOR_BETA_DASHBOARD'] = True
+FEATURES['ENABLE_INSTRUCTOR_LEGACY_DASHBOARD'] = True
 
 FEATURES['ENABLE_SHOPPING_CART'] = True
+
+FEATURES['ENABLE_VERIFIED_CERTIFICATES'] = True
 
 # Enable this feature for course staff grade downloads, to enable acceptance tests
 FEATURES['ENABLE_S3_GRADE_DOWNLOADS'] = True
@@ -180,6 +182,9 @@ SECRET_KEY = '85920908f28904ed733fe576320db18cabd7b6cd'
 # hide ratelimit warnings while running tests
 filterwarnings('ignore', message='No request passed to the backend, unable to rate-limit')
 
+######### Third-party auth ##########
+FEATURES['ENABLE_THIRD_PARTY_AUTH'] = True
+
 ################################## OPENID #####################################
 FEATURES['AUTH_USE_OPENID'] = True
 FEATURES['AUTH_USE_OPENID_PROVIDER'] = True
@@ -257,6 +262,7 @@ LETTUCE_SERVER_PORT = 8003
 XQUEUE_PORT = 8040
 YOUTUBE_PORT = 8031
 LTI_PORT = 8765
+VIDEO_SOURCE_PORT = 8777
 
 ################### Make tests faster
 
@@ -280,6 +286,9 @@ FEATURES['CLASS_DASHBOARD'] = True
 
 import openid.oidutil
 openid.oidutil.log = lambda message, level = 0: None
+
+PLATFORM_NAME = "edX"
+SITE_NAME = "edx.org"
 
 # set up some testing for microsites
 MICROSITE_CONFIGURATION = {
@@ -311,3 +320,13 @@ FEATURES['USE_MICROSITES'] = True
 
 ######### LinkedIn ########
 LINKEDIN_API['COMPANY_ID'] = '0000000'
+
+# Setting for the testing of Software Secure Result Callback
+VERIFY_STUDENT["SOFTWARE_SECURE"] = {
+        "API_ACCESS_KEY": "BBBBBBBBBBBBBBBBBBBB",
+        "API_SECRET_KEY": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+}
+
+VIDEO_CDN_URL = {
+    'CN': 'http://api.xuetangx.com/edx/video?s3_url='
+}

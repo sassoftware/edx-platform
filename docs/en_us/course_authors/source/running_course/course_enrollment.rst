@@ -41,8 +41,8 @@ have registered and activated user accounts can enroll themselves in
 For a more detailed description of this process from a student's point of
 view, see :ref:`Sample Student Login Guide`.
 
-Course authors and instructors can enroll students in a course either before
-or after the students register their user accounts.
+Course authors and instructors, however, can enroll students in a course either
+before or after the students register their user accounts.
 
 To work on a course, all course staff members must also have registered and
 activated user accounts and be enrolled in the course.
@@ -63,43 +63,43 @@ When you enroll people in a course you have these options:
 * **Auto Enroll**. When you choose this option, the people who you enroll do
   not need to complete an explicit course enrollment step. Of the list of
   email addresses that you supply, those that correspond to a registered user
-  account are immediately enrolled in the course. Email addresses on the list
-  that do not match a registered user account are enrolled as soon as the
+  account are immediately enrolled in the course, and your course displays on the dashboards on log in. Email addresses on the list
+  that do not match a registered user account are enrolled as soon as that
   account is registered and activated.
 
-* **Notify students by email**. When you choose this option, an email message
-  is automatically sent to each of the email addresses that you supply. The
-  message includes the name of the course, a link to the registration page,
-  and a reminder to use that same email address to register. Whether you
-  choose to send a notification or not, enrolled students see your course on
-  their dashboards when they log in.
+  If you do not select **Auto Enroll**, the people who you enroll must also actively locate your course and enroll themselves in it. These students see the course on their dashboards after they have done so.
 
-  An example of the email message that enrollees receive when you select this
-  option follows.
+* **Notify students by email**. When you choose this option, an email message is
+  automatically sent to each of the email addresses that you supply. The message
+  includes the name of the course and, for students who are not already
+  registered, a reminder to use that same email address to register.
+
+  An example of the email message that a student received when this option was
+  selected during enrollment follows. In this example, the student already had a
+  registered and activated edx.org account, and both **Auto Enroll** and
+  **Notify students by email** were selected.
 
   .. image:: ../Images/Course_Enrollment_Email.png
-        :alt: Email message inviting a student to enroll in the EdX 101 course
-        :width: 800
+        :alt: Email message inviting a student to enroll in an edx.org course
 
 To enroll students or staff members:
 
 #. View the live version of your course.
 
-#. Click **Instructor** then **Try New Beta Dashboard**.
+#. Click **Instructor**, then click **Membership**. 
 
-#. Click **Membership**. 
-
-#. In the **Batch Enrollment** section of the page, enter an email address or
-   multiple addresses separated by commas or line feeds.
+#. In the **Batch Enrollment** section of the page, enter the username or email
+   address of the student, or enter multiple names or addresses separated by
+   commas or new lines.
 
   You can copy and paste data from a CSV file of email addresses. However,
   note that this feature is better suited to courses with smaller enrollments,
   rather than courses with massive enrollments.
 
-5. Optionally, select **Auto Enroll** to streamline the course enrollment
-   process for the students.
+4. To streamline the course enrollment process, leave **Auto Enroll** selected.
 
-#. Optionally, select **Notify students by email** to send students email. 
+#. To send students an email message, leave **Notify students by email**
+   selected.
 
 #. Click **Enroll**.
 
@@ -127,9 +127,7 @@ To view the enrollment count for a course:
 
 #. View the live version of your course.
 
-#. Click **Instructor** then **Try New Beta Dashboard**.
-
-#. Click **Course Info** if necessary. 
+#. Click **Instructor**, then click **Course Info** if necessary. 
 
   The **Enrollment Information** section of the page that opens shows the total
   number of people who are currently enrolled.
@@ -158,10 +156,15 @@ To unenroll students, you supply the email addresses of enrolled students.
 
 #. Click **Membership**. 
 
-#. In the **Batch Enrollment** section of the page, enter an email address or
-   multiple addresses separated by commas or line feeds.
+#. In the **Batch Enrollment** section of the page, enter a username or an email
+   address, or multiple names or addresses separated by commas or new lines.
 
-#. Click **Unenroll**. The course is no longer listed on the students'
+#. To send students an email message, leave **Notify students by email**
+   selected.
+
+.. note:: The **Auto Enroll** option has no effect when you click **Unenroll**.
+
+5. Click **Unenroll**. The course is no longer listed on the students'
    dashboards, and the students can no longer contribute to discussions or the
    wiki or access the courseware.
 

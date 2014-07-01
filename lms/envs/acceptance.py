@@ -88,6 +88,15 @@ TRACKING_BACKENDS.update({
     }
 })
 
+EVENT_TRACKING_BACKENDS.update({
+    'mongo': {
+        'ENGINE': 'eventtracking.backends.mongodb.MongoBackend',
+        'OPTIONS': {
+            'database': 'track'
+        }
+    }
+})
+
 
 # Enable asset pipeline
 # Our fork of django-pipeline uses `PIPELINE` instead of `PIPELINE_ENABLED`
@@ -106,6 +115,10 @@ FEATURES['ENABLE_DISCUSSION_SERVICE'] = False
 
 # Use the auto_auth workflow for creating users and logging them in
 FEATURES['AUTOMATIC_AUTH_FOR_TESTING'] = True
+
+# Third-party auth is enabled in lms/envs/test.py for unittests, but we don't
+# yet want it for acceptance tests.
+FEATURES['ENABLE_THIRD_PARTY_AUTH'] = False
 
 # Enable fake payment processing page
 FEATURES['ENABLE_PAYMENT_FAKE'] = True
@@ -182,6 +195,6 @@ XQUEUE_INTERFACE = {
 }
 
 # Point the URL used to test YouTube availability to our stub YouTube server
-YOUTUBE['API'] = 'youtube.com/iframe_api'
+YOUTUBE['API'] = "127.0.0.1:{0}/get_youtube_api/".format(YOUTUBE_PORT)
 YOUTUBE['TEST_URL'] = "127.0.0.1:{0}/test_youtube/".format(YOUTUBE_PORT)
 YOUTUBE['TEXT_API']['url'] = "127.0.0.1:{0}/test_transcripts_youtube/".format(YOUTUBE_PORT)

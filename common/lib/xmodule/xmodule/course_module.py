@@ -8,8 +8,7 @@ from datetime import datetime
 import dateutil.parser
 from lazy import lazy
 
-from xmodule.modulestore import Location
-from xmodule.partitions.partitions import UserPartition
+from opaque_keys.edx.locations import Location
 from xmodule.seq_module import SequenceDescriptor, SequenceModule
 from xmodule.graders import grader_from_conf
 from xmodule.tabs import CourseTabList
@@ -17,10 +16,13 @@ import json
 
 from xblock.fields import Scope, List, String, Dict, Boolean, Integer
 from .fields import Date
-from xmodule.modulestore.locator import CourseLocator
+from opaque_keys.edx.locator import CourseLocator
 from django.utils.timezone import UTC
 
 log = logging.getLogger(__name__)
+
+# Make '_' a no-op so we can scrape strings
+_ = lambda text: text
 
 
 class StringOrDate(Date):
@@ -157,28 +159,10 @@ class TextbookList(List):
         return json_data
 
 
-class UserPartitionList(List):
-    """Special List class for listing UserPartitions"""
-    def from_json(self, values):
-        return [UserPartition.from_json(v) for v in values]
-
-    def to_json(self, values):
-        return [user_partition.to_json()
-                for user_partition in values]
-
-
 class CourseFields(object):
     lti_passports = List(help="LTI tools passports as id:client_key:client_secret", scope=Scope.settings)
     textbooks = TextbookList(help="List of pairs of (title, url) for textbooks used in this course",
                              default=[], scope=Scope.content)
-
-    # This is should be scoped to content, but since it's defined in the policy
-    # file, it is currently scoped to settings.
-    user_partitions = UserPartitionList(
-        help="List of user partitions of this course into groups, used e.g. for experiments",
-        default=[],
-        scope=Scope.settings
-    )
 
     wiki_slug = String(help="Slug that points to the wiki for this course", scope=Scope.content)
     enrollment_start = Date(help="Date that enrollment for this class is opened", scope=Scope.settings)
@@ -223,7 +207,7 @@ class CourseFields(object):
                               }},
                           scope=Scope.content)
     show_calculator = Boolean(help="Whether to show the calculator in this course", default=False, scope=Scope.settings)
-    display_name = String(help="Display name for this module", default="Empty", display_name="Display Name", scope=Scope.settings)
+    display_name = String(help="Display name for this module", default="Empty", display_name=_("Display Name"), scope=Scope.settings)
     course_edit_method = String(help="Method with which this course is edited.", default="Studio", scope=Scope.settings)
     show_chat = Boolean(help="Whether to show the chat widget in this course", default=False, scope=Scope.settings)
     tabs = CourseTabList(help="List of tabs to enable in this course", scope=Scope.settings, default=[])
@@ -245,117 +229,117 @@ class CourseFields(object):
     has_children = True
     checklists = List(scope=Scope.settings,
                       default=[
-                          {"short_description": "Getting Started With Studio",
-                           "items": [{"short_description": "Add Course Team Members",
-                                      "long_description": "Grant your collaborators permission to edit your course so you can work together.",
+                          {"short_description": _("Getting Started With Studio"),
+                           "items": [{"short_description": _("Add Course Team Members"),
+                                      "long_description": _("Grant your collaborators permission to edit your course so you can work together."),
                                       "is_checked": False,
                                       "action_url": "ManageUsers",
-                                      "action_text": "Edit Course Team",
+                                      "action_text": _("Edit Course Team"),
                                       "action_external": False},
-                                     {"short_description": "Set Important Dates for Your Course",
-                                      "long_description": "Establish your course's student enrollment and launch dates on the Schedule and Details page.",
+                                     {"short_description": _("Set Important Dates for Your Course"),
+                                      "long_description": _("Establish your course's student enrollment and launch dates on the Schedule and Details page."),
                                       "is_checked": False,
                                       "action_url": "SettingsDetails",
-                                      "action_text": "Edit Course Details &amp; Schedule",
+                                      "action_text": _("Edit Course Details &amp; Schedule"),
                                       "action_external": False},
-                                     {"short_description": "Draft Your Course's Grading Policy",
-                                      "long_description": "Set up your assignment types and grading policy even if you haven't created all your assignments.",
+                                     {"short_description": _("Draft Your Course's Grading Policy"),
+                                      "long_description": _("Set up your assignment types and grading policy even if you haven't created all your assignments."),
                                       "is_checked": False,
                                       "action_url": "SettingsGrading",
-                                      "action_text": "Edit Grading Settings",
+                                      "action_text": _("Edit Grading Settings"),
                                       "action_external": False},
-                                     {"short_description": "Explore the Other Studio Checklists",
-                                      "long_description": "Discover other available course authoring tools, and find help when you need it.",
+                                     {"short_description": _("Explore the Other Studio Checklists"),
+                                      "long_description": _("Discover other available course authoring tools, and find help when you need it."),
                                       "is_checked": False,
                                       "action_url": "",
                                       "action_text": "",
                                       "action_external": False}]},
-                          {"short_description": "Draft a Rough Course Outline",
-                           "items": [{"short_description": "Create Your First Section and Subsection",
-                                      "long_description": "Use your course outline to build your first Section and Subsection.",
+                          {"short_description": _("Draft a Rough Course Outline"),
+                           "items": [{"short_description": _("Create Your First Section and Subsection"),
+                                      "long_description": _("Use your course outline to build your first Section and Subsection."),
                                       "is_checked": False,
                                       "action_url": "CourseOutline",
-                                      "action_text": "Edit Course Outline",
+                                      "action_text": _("Edit Course Outline"),
                                       "action_external": False},
-                                     {"short_description": "Set Section Release Dates",
-                                      "long_description": "Specify the release dates for each Section in your course. Sections become visible to students on their release dates.",
+                                     {"short_description": _("Set Section Release Dates"),
+                                      "long_description": _("Specify the release dates for each Section in your course. Sections become visible to students on their release dates."),
                                       "is_checked": False,
                                       "action_url": "CourseOutline",
-                                      "action_text": "Edit Course Outline",
+                                      "action_text": _("Edit Course Outline"),
                                       "action_external": False},
-                                     {"short_description": "Designate a Subsection as Graded",
-                                      "long_description": "Set a Subsection to be graded as a specific assignment type. Assignments within graded Subsections count toward a student's final grade.",
+                                     {"short_description": _("Designate a Subsection as Graded"),
+                                      "long_description": _("Set a Subsection to be graded as a specific assignment type. Assignments within graded Subsections count toward a student's final grade."),
                                       "is_checked": False,
                                       "action_url": "CourseOutline",
-                                      "action_text": "Edit Course Outline",
+                                      "action_text": _("Edit Course Outline"),
                                       "action_external": False},
-                                     {"short_description": "Reordering Course Content",
-                                      "long_description": "Use drag and drop to reorder the content in your course.",
+                                     {"short_description": _("Reordering Course Content"),
+                                      "long_description": _("Use drag and drop to reorder the content in your course."),
                                       "is_checked": False,
                                       "action_url": "CourseOutline",
-                                      "action_text": "Edit Course Outline",
+                                      "action_text": _("Edit Course Outline"),
                                       "action_external": False},
-                                     {"short_description": "Renaming Sections",
-                                      "long_description": "Rename Sections by clicking the Section name from the Course Outline.",
+                                     {"short_description": _("Renaming Sections"),
+                                      "long_description": _("Rename Sections by clicking the Section name from the Course Outline."),
                                       "is_checked": False,
                                       "action_url": "CourseOutline",
-                                      "action_text": "Edit Course Outline",
+                                      "action_text": _("Edit Course Outline"),
                                       "action_external": False},
-                                     {"short_description": "Deleting Course Content",
-                                      "long_description": "Delete Sections, Subsections, or Units you don't need anymore. Be careful, as there is no Undo function.",
+                                     {"short_description": _("Deleting Course Content"),
+                                      "long_description": _("Delete Sections, Subsections, or Units you don't need anymore. Be careful, as there is no Undo function."),
                                       "is_checked": False,
                                       "action_url": "CourseOutline",
-                                      "action_text": "Edit Course Outline",
+                                      "action_text": _("Edit Course Outline"),
                                       "action_external": False},
-                                     {"short_description": "Add an Instructor-Only Section to Your Outline",
-                                      "long_description": "Some course authors find using a section for unsorted, in-progress work useful. To do this, create a section and set the release date to the distant future.",
+                                     {"short_description": _("Add an Instructor-Only Section to Your Outline"),
+                                      "long_description": _("Some course authors find using a section for unsorted, in-progress work useful. To do this, create a section and set the release date to the distant future."),
                                       "is_checked": False,
                                       "action_url": "CourseOutline",
-                                      "action_text": "Edit Course Outline",
+                                      "action_text": _("Edit Course Outline"),
                                       "action_external": False}]},
-                          {"short_description": "Explore edX's Support Tools",
-                           "items": [{"short_description": "Explore the Studio Help Forum",
-                                      "long_description": "Access the Studio Help forum from the menu that appears when you click your user name in the top right corner of Studio.",
+                          {"short_description": _("Explore edX's Support Tools"),
+                           "items": [{"short_description": _("Explore the Studio Help Forum"),
+                                      "long_description": _("Access the Studio Help forum from the menu that appears when you click your user name in the top right corner of Studio."),
                                       "is_checked": False,
                                       "action_url": "http://help.edge.edx.org/",
-                                      "action_text": "Visit Studio Help",
+                                      "action_text": _("Visit Studio Help"),
                                       "action_external": True},
-                                     {"short_description": "Enroll in edX 101",
-                                      "long_description": "Register for edX 101, edX's primer for course creation.",
+                                     {"short_description": _("Enroll in edX 101"),
+                                      "long_description": _("Register for edX 101, edX's primer for course creation."),
                                       "is_checked": False,
                                       "action_url": "https://edge.edx.org/courses/edX/edX101/How_to_Create_an_edX_Course/about",
-                                      "action_text": "Register for edX 101",
+                                      "action_text": _("Register for edX 101"),
                                       "action_external": True},
-                                     {"short_description": "Download the Studio Documentation",
-                                      "long_description": "Download the searchable Studio reference documentation in PDF form.",
+                                     {"short_description": _("Download the Studio Documentation"),
+                                      "long_description": _("Download the searchable Studio reference documentation in PDF form."),
                                       "is_checked": False,
                                       "action_url": "http://files.edx.org/Getting_Started_with_Studio.pdf",
-                                      "action_text": "Download Documentation",
+                                      "action_text": _("Download Documentation"),
                                       "action_external": True}]},
-                          {"short_description": "Draft Your Course About Page",
-                           "items": [{"short_description": "Draft a Course Description",
-                                      "long_description": "Courses on edX have an About page that includes a course video, description, and more. Draft the text students will read before deciding to enroll in your course.",
+                          {"short_description": _("Draft Your Course About Page"),
+                           "items": [{"short_description": _("Draft a Course Description"),
+                                      "long_description": _("Courses on edX have an About page that includes a course video, description, and more. Draft the text students will read before deciding to enroll in your course."),
                                       "is_checked": False,
                                       "action_url": "SettingsDetails",
-                                      "action_text": "Edit Course Schedule &amp; Details",
+                                      "action_text": _("Edit Course Schedule &amp; Details"),
                                       "action_external": False},
-                                     {"short_description": "Add Staff Bios",
-                                      "long_description": "Showing prospective students who their instructor will be is helpful. Include staff bios on the course About page.",
+                                     {"short_description": _("Add Staff Bios"),
+                                      "long_description": _("Showing prospective students who their instructor will be is helpful. Include staff bios on the course About page."),
                                       "is_checked": False,
                                       "action_url": "SettingsDetails",
-                                      "action_text": "Edit Course Schedule &amp; Details",
+                                      "action_text": _("Edit Course Schedule &amp; Details"),
                                       "action_external": False},
-                                     {"short_description": "Add Course FAQs",
-                                      "long_description": "Include a short list of frequently asked questions about your course.",
+                                     {"short_description": _("Add Course FAQs"),
+                                      "long_description": _("Include a short list of frequently asked questions about your course."),
                                       "is_checked": False,
                                       "action_url": "SettingsDetails",
-                                      "action_text": "Edit Course Schedule &amp; Details",
+                                      "action_text": _("Edit Course Schedule &amp; Details"),
                                       "action_external": False},
-                                     {"short_description": "Add Course Prerequisites",
-                                      "long_description": "Let students know what knowledge and/or skills they should have before they enroll in your course.",
+                                     {"short_description": _("Add Course Prerequisites"),
+                                      "long_description": _("Let students know what knowledge and/or skills they should have before they enroll in your course."),
                                       "is_checked": False,
                                       "action_url": "SettingsDetails",
-                                      "action_text": "Edit Course Schedule &amp; Details",
+                                      "action_text": _("Edit Course Schedule &amp; Details"),
                                       "action_external": False}]}
         ])
     info_sidebar_name = String(scope=Scope.settings, default='Course Handouts')
@@ -369,6 +353,9 @@ class CourseFields(object):
     )
     enrollment_domain = String(help="External login method associated with user accounts allowed to register in course",
                                scope=Scope.settings)
+    certificates_show_before_end = Boolean(help="True if students may download certificates before course end",
+                                           scope=Scope.settings,
+                                           default=False)
     course_image = String(
         help="Filename of the course image",
         scope=Scope.settings,
@@ -438,7 +425,7 @@ class CourseDescriptor(CourseFields, SequenceDescriptor):
             if isinstance(self.location, Location):
                 self.wiki_slug = self.location.course
             elif isinstance(self.location, CourseLocator):
-                self.wiki_slug = self.location.package_id or self.display_name
+                self.wiki_slug = self.id.offering or self.display_name
 
         if self.due_date_display_format is None and self.show_timezone is False:
             # For existing courses with show_timezone set to False (and no due_date_display_format specified),
@@ -591,6 +578,12 @@ class CourseDescriptor(CourseFields, SequenceDescriptor):
             return False
 
         return datetime.now(UTC()) > self.end
+
+    def may_certify(self):
+        """
+        Return True if it is acceptable to show the student a certificate download link
+        """
+        return self.certificates_show_before_end or self.has_ended()
 
     def has_started(self):
         return datetime.now(UTC()) > self.start
@@ -810,32 +803,10 @@ class CourseDescriptor(CourseFields, SequenceDescriptor):
     def make_id(org, course, url_name):
         return '/'.join([org, course, url_name])
 
-    @staticmethod
-    def id_to_location(course_id):
-        '''Convert the given course_id (org/course/name) to a location object.
-        Throws ValueError if course_id is of the wrong format.
-        '''
-        course_id_dict = Location.parse_course_id(course_id)
-        course_id_dict['tag'] = 'i4x'
-        course_id_dict['category'] = 'course'
-        return Location(course_id_dict)
-
-    @staticmethod
-    def location_to_id(location):
-        '''Convert a location of a course to a course_id.  If location category
-        is not "course", raise a ValueError.
-
-        location: something that can be passed to Location
-        '''
-        loc = Location(location)
-        if loc.category != "course":
-            raise ValueError("{0} is not a course location".format(loc))
-        return "/".join([loc.org, loc.course, loc.name])
-
     @property
     def id(self):
         """Return the course_id for this course"""
-        return self.location_to_id(self.location)
+        return self.location.course_key
 
     @property
     def start_date_text(self):

@@ -33,7 +33,6 @@ from lms.envs.common import (
 from path import path
 
 from lms.lib.xblock.mixin import LmsBlockMixin
-from cms.lib.xblock.mixin import CmsBlockMixin
 from dealer.git import git
 
 ############################ FEATURE CONFIGURATION #############################
@@ -53,8 +52,6 @@ FEATURES = {
 
     # email address for studio staff (eg to request course creation)
     'STUDIO_REQUEST_EMAIL': '',
-
-    'STUDIO_NPS_SURVEY': True,
 
     # Segment.io - must explicitly turn it on for production
     'SEGMENT_IO': False,
@@ -85,8 +82,11 @@ FEATURES = {
     # Hide any Personally Identifiable Information from application logs
     'SQUELCH_PII_IN_LOGS': False,
 
-    # Toggles embargo functionality
+    # Toggles the embargo functionality, which enable embargoing for particular courses
     'EMBARGO': False,
+
+    # Toggles the embargo site functionality, which enable embargoing for the whole site
+    'SITE_EMBARGOED': False,
 
     # Turn on/off Microsites feature
     'USE_MICROSITES': False,
@@ -99,12 +99,6 @@ FEATURES = {
 
     # Turn off Advanced Security by default
     'ADVANCED_SECURITY': False,
-
-    # Temporary feature flag for duplicating xblock leaves
-    'ENABLE_DUPLICATE_XBLOCK_LEAF_COMPONENT': False,
-
-    # Temporary feature flag for deleting xblock leaves
-    'ENABLE_DELETE_XBLOCK_LEAF_COMPONENT': False,
 }
 ENABLE_JASMINE = False
 
@@ -243,7 +237,7 @@ from xmodule.x_module import XModuleMixin
 
 # This should be moved into an XBlock Runtime/Application object
 # once the responsibility of XBlock creation is moved out of modulestore - cpennington
-XBLOCK_MIXINS = (LmsBlockMixin, CmsBlockMixin, InheritanceMixin, XModuleMixin)
+XBLOCK_MIXINS = (LmsBlockMixin, InheritanceMixin, XModuleMixin)
 
 # Allow any XBlock in Studio
 # You should also enable the ALLOW_ALL_ADVANCED_COMPONENTS feature flag, so that
@@ -260,7 +254,6 @@ SITE_ID = 1
 SITE_NAME = "localhost:8001"
 HTTPS = 'on'
 ROOT_URLCONF = 'cms.urls'
-IGNORABLE_404_ENDS = ('favicon.ico')
 
 # Email
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
@@ -303,6 +296,9 @@ LOCALE_PATHS = (REPO_ROOT + '/conf/locale',)  # edx-platform/conf/locale/
 # Messages
 MESSAGE_STORAGE = 'django.contrib.messages.storage.session.SessionStorage'
 
+##### EMBARGO #####
+EMBARGO_SITE_REDIRECT_URL = None
+
 ############################### Pipeline #######################################
 
 STATICFILES_STORAGE = 'pipeline.storage.PipelineCachedStorage'
@@ -319,7 +315,7 @@ PIPELINE_CSS = {
             'css/vendor/ui-lightness/jquery-ui-1.8.22.custom.css',
             'css/vendor/jquery.qtip.min.css',
             'js/vendor/markitup/skins/simple/style.css',
-            'js/vendor/markitup/sets/wiki/style.css'
+            'js/vendor/markitup/sets/wiki/style.css',
         ],
         'output_filename': 'css/cms-style-vendor.css',
     },
@@ -546,7 +542,7 @@ COURSES_WITH_UNSAFE_CODE = []
 
 ############################## EVENT TRACKING #################################
 
-TRACK_MAX_EVENT = 10000
+TRACK_MAX_EVENT = 50000
 
 TRACKING_BACKENDS = {
     'logger': {
@@ -557,6 +553,26 @@ TRACKING_BACKENDS = {
     }
 }
 
+# We're already logging events, and we don't want to capture user
+# names/passwords.  Heartbeat events are likely not interesting.
+TRACKING_IGNORE_URL_PATTERNS = [r'^/event', r'^/login', r'^/heartbeat']
+
+EVENT_TRACKING_ENABLED = True
+EVENT_TRACKING_BACKENDS = {
+    'logger': {
+        'ENGINE': 'eventtracking.backends.logger.LoggerBackend',
+        'OPTIONS': {
+            'name': 'tracking',
+            'max_event_size': TRACK_MAX_EVENT,
+        }
+    }
+}
+EVENT_TRACKING_PROCESSORS = [
+    {
+        'ENGINE': 'track.shim.LegacyFieldMappingProcessor'
+    }
+]
+
 #### PASSWORD POLICY SETTINGS #####
 
 PASSWORD_MIN_LENGTH = None
@@ -564,11 +580,6 @@ PASSWORD_MAX_LENGTH = None
 PASSWORD_COMPLEXITY = {}
 PASSWORD_DICTIONARY_EDIT_DISTANCE_THRESHOLD = None
 PASSWORD_DICTIONARY = []
-
-# We're already logging events, and we don't want to capture user
-# names/passwords.  Heartbeat events are likely not interesting.
-TRACKING_IGNORE_URL_PATTERNS = [r'^/event', r'^/login', r'^/heartbeat']
-TRACKING_ENABLED = True
 
 ##### ACCOUNT LOCKOUT DEFAULT PARAMETERS #####
 MAX_FAILED_LOGIN_ATTEMPTS_ALLOWED = 5

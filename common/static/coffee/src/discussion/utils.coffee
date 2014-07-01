@@ -73,6 +73,7 @@ class @DiscussionUtil
       downvote_comment        : "/courses/#{$$course_id}/discussion/comments/#{param}/downvote"
       undo_vote_for_comment   : "/courses/#{$$course_id}/discussion/comments/#{param}/unvote"
       upload                  : "/courses/#{$$course_id}/discussion/upload"
+      users                   : "/courses/#{$$course_id}/discussion/users"
       search                  : "/courses/#{$$course_id}/discussion/forum/search"
       retrieve_discussion     : "/courses/#{$$course_id}/discussion/forum/#{param}/inline"
       retrieve_single_thread  : "/courses/#{$$course_id}/discussion/forum/#{param}/threads/#{param1}"
@@ -299,3 +300,18 @@ class @DiscussionUtil
         minLength++
       return text.substr(0, minLength) + gettext('…')
 
+  @getPaginationParams: (curPage, numPages, pageUrlFunc) =>
+    delta = 2
+    minPage = Math.max(curPage - delta, 1)
+    maxPage = Math.min(curPage + delta, numPages)
+    pageInfo = (pageNum) -> {number: pageNum, url: pageUrlFunc(pageNum)}
+    params =
+      page: curPage
+      lowPages: _.range(minPage, curPage).map(pageInfo)
+      highPages: _.range(curPage+1, maxPage+1).map(pageInfo)
+      previous: if curPage > 1 then pageInfo(curPage - 1) else null
+      next: if curPage < numPages then pageInfo(curPage + 1) else null
+      leftdots: minPage > 2
+      rightdots: maxPage < numPages-1
+      first: if minPage > 1 then pageInfo(1) else null
+      last: if maxPage < numPages then pageInfo(numPages) else null

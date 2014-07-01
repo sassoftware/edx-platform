@@ -4,7 +4,13 @@ from bok_choy.promise import EmptyPromise
 from .course_page import CoursePage
 
 
-class DiscussionThreadPage(PageObject):
+class DiscussionPageMixin(object):
+
+    def is_ajax_finished(self):
+        return self.browser.execute_script("return jQuery.active") == 0
+
+
+class DiscussionThreadPage(PageObject, DiscussionPageMixin):
     url = None
 
     def __init__(self, browser, thread_selector):
@@ -53,11 +59,8 @@ class DiscussionThreadPage(PageObject):
         """Clicks the load more responses button and waits for responses to load"""
         self._find_within(".load-response-button").click()
 
-        def _is_ajax_finished():
-            return self.browser.execute_script("return jQuery.active") == 0
-
         EmptyPromise(
-            _is_ajax_finished,
+            self.is_ajax_finished,
             "Loading more Responses"
         ).fulfill()
 
@@ -164,6 +167,38 @@ class DiscussionThreadPage(PageObject):
         ).fulfill()
 
 
+class DiscussionSortPreferencePage(CoursePage):
+    """
+    Page that contain the discussion board with sorting options
+    """
+    def __init__(self, browser, course_id):
+        super(DiscussionSortPreferencePage, self).__init__(browser, course_id)
+        self.url_path = "discussion/forum"
+
+    def is_browser_on_page(self):
+        """
+        Return true if the browser is on the right page else false.
+        """
+        return self.q(css="body.discussion .sort-bar").present
+
+    def get_selected_sort_preference_text(self):
+        """
+        Return the text of option that is selected for sorting.
+        """
+        return self.q(css="body.discussion .sort-bar a.active").text[0].lower()
+
+    def change_sort_preference(self, sort_by):
+        """
+        Change the option of sorting by clicking on new option.
+        """
+        self.q(css="body.discussion .sort-bar a[data-sort='{0}']".format(sort_by)).click()
+
+    def refresh_page(self):
+        """
+        Reload the page.
+        """
+        self.browser.refresh()
+
 class DiscussionTabSingleThreadPage(CoursePage):
     def __init__(self, browser, course_id, thread_id):
         super(DiscussionTabSingleThreadPage, self).__init__(browser, course_id)
@@ -229,5 +264,122 @@ class InlineDiscussionThreadPage(DiscussionThreadPage):
         EmptyPromise(
             lambda: bool(self.get_response_total_text()),
             "Thread expanded"
+        ).fulfill()
+
+
+class DiscussionUserProfilePage(CoursePage):
+
+    TEXT_NEXT = u'Next >'
+    TEXT_PREV = u'< Previous'
+    PAGING_SELECTOR = "a.discussion-pagination[data-page-number]"
+
+    def __init__(self, browser, course_id, user_id, username, page=1):
+        super(DiscussionUserProfilePage, self).__init__(browser, course_id)
+        self.url_path = "discussion/forum/dummy/users/{}?page={}".format(user_id, page)
+        self.username = username
+
+    def is_browser_on_page(self):
+        return (
+            self.q(css='section.discussion-user-threads[data-course-id="{}"]'.format(self.course_id)).present
+            and
+            self.q(css='section.user-profile div.sidebar-username').present
+            and
+            self.q(css='section.user-profile div.sidebar-username').text[0] == self.username
+        )
+
+    def get_shown_thread_ids(self):
+        elems = self.q(css="article.discussion-thread")
+        return [elem.get_attribute("id")[7:] for elem in elems]
+
+    def get_current_page(self):
+        return int(self.q(css="nav.discussion-paginator li.current-page").text[0])
+
+    def _check_pager(self, text, page_number=None):
+        """
+        returns True if 'text' matches the text in any of the pagination elements.  If
+        page_number is provided, only return True if the element points to that result
+        page.
+        """
+        elems = self.q(css=self.PAGING_SELECTOR).filter(lambda elem: elem.text == text)
+        if page_number:
+            elems = elems.filter(lambda elem: int(elem.get_attribute('data-page-number')) == page_number)
+        return elems.present
+
+    def get_clickable_pages(self):
+        return sorted([
+            int(elem.get_attribute('data-page-number'))
+            for elem in self.q(css=self.PAGING_SELECTOR)
+            if str(elem.text).isdigit()
+        ])
+
+    def is_prev_button_shown(self, page_number=None):
+        return self._check_pager(self.TEXT_PREV, page_number)
+
+    def is_next_button_shown(self, page_number=None):
+        return self._check_pager(self.TEXT_NEXT, page_number)
+
+    def _click_pager_with_text(self, text, page_number):
+        """
+        click the first pagination element with whose text is `text` and ensure
+        the resulting page number matches `page_number`.
+        """
+        targets = [elem for elem in self.q(css=self.PAGING_SELECTOR) if elem.text == text]
+        targets[0].click()
+        EmptyPromise(
+            lambda: self.get_current_page() == page_number,
+            "navigated to desired page"
+        ).fulfill()
+
+    def click_prev_page(self):
+        self._click_pager_with_text(self.TEXT_PREV, self.get_current_page() - 1)
+
+    def click_next_page(self):
+        self._click_pager_with_text(self.TEXT_NEXT, self.get_current_page() + 1)
+
+    def click_on_page(self, page_number):
+        self._click_pager_with_text(unicode(page_number), page_number)
+
+
+class DiscussionTabHomePage(CoursePage, DiscussionPageMixin):
+
+    ALERT_SELECTOR = ".discussion-body .sidebar .search-alert"
+
+    def __init__(self, browser, course_id):
+        super(DiscussionTabHomePage, self).__init__(browser, course_id)
+        self.url_path = "discussion/forum/"
+
+    def is_browser_on_page(self):
+        return self.q(css=".discussion-body section.home-header").present
+
+    def perform_search(self, text="dummy"):
+        self.q(css=".discussion-body .sidebar .search").first.click()
+        EmptyPromise(
+            lambda: self.q(css=".discussion-body .sidebar .search.is-open").present,
+            "waiting for search input to be available"
+        ).fulfill()
+        self.q(css="#search-discussions").fill(text + chr(10))
+        EmptyPromise(
+            self.is_ajax_finished,
+            "waiting for server to return result"
+        ).fulfill()
+
+    def get_search_alert_messages(self):
+        return self.q(css=self.ALERT_SELECTOR + " .message").text
+
+    def get_search_alert_links(self):
+        return self.q(css=self.ALERT_SELECTOR + " .link-jump")
+
+    def dismiss_alert_message(self, text):
+        """
+        dismiss any search alert message containing the specified text.
+        """
+        def _match_messages(text):
+            return self.q(css=".search-alert").filter(lambda elem: text in elem.text)
+
+        for alert_id in _match_messages(text).attrs("id"):
+            self.q(css="{}#{} a.dismiss".format(self.ALERT_SELECTOR, alert_id)).click()
+        EmptyPromise(
+            lambda: _match_messages(text).results == [],
+            "waiting for dismissed alerts to disappear"
         ).fulfill()
 

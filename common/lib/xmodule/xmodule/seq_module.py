@@ -11,7 +11,7 @@ from .exceptions import NotFoundError
 from .fields import Date
 from .mako_module import MakoModuleDescriptor
 from .progress import Progress
-from .x_module import XModule
+from .x_module import XModule, STUDENT_VIEW
 from .xml_module import XmlDescriptor
 
 log = logging.getLogger(__name__)
@@ -85,7 +85,7 @@ class SequenceModule(SequenceFields, XModule):
 
         for child in self.get_display_items():
             progress = child.get_progress()
-            rendered_child = child.render('student_view', context)
+            rendered_child = child.render(STUDENT_VIEW, context)
             fragment.add_frag_resources(rendered_child)
 
             titles = child.get_content_titles()
@@ -96,7 +96,7 @@ class SequenceModule(SequenceFields, XModule):
                 'progress_status': Progress.to_js_status_str(progress),
                 'progress_detail': Progress.to_js_detail_str(progress),
                 'type': child.get_icon_class(),
-                'id': child.id,
+                'id': child.scope_ids.usage_id.to_deprecated_string(),
             }
             if childinfo['title'] == '':
                 childinfo['title'] = child.display_name_with_default
@@ -104,7 +104,7 @@ class SequenceModule(SequenceFields, XModule):
 
         params = {'items': contents,
                   'element_id': self.location.html_id(),
-                  'item_id': self.id,
+                  'item_id': self.location.to_deprecated_string(),
                   'position': self.position,
                   'tag': self.location.category,
                   'ajax_url': self.system.ajax_url,

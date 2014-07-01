@@ -15,12 +15,12 @@ the course, section, subsection, unit, etc.
 
 import unittest
 import datetime
-from mock import Mock
+from mock import Mock, patch
 
 from . import LogicTest
 from lxml import etree
-from xmodule.modulestore import Location
-from xmodule.video_module import VideoDescriptor, create_youtube_string, get_ext
+from opaque_keys.edx.locations import Location
+from xmodule.video_module import VideoDescriptor, create_youtube_string, get_video_from_cdn
 from .test_import import DummySystem
 from xblock.field_data import DictFieldData
 from xblock.fields import ScopeIds
@@ -107,25 +107,13 @@ class VideoModuleTest(LogicTest):
              '1.50': ''}
         )
 
-    def test_get_ext(self):
-        """Test get the file's extension in a url without query string."""
-        filename_str = 'http://www.example.com/path/video.mp4'
-        output = get_ext(filename_str)
-        self.assertEqual(output, 'mp4')
-
-    def test_get_ext_with_query_string(self):
-        """Test get the file's extension in a url with query string."""
-        filename_str = 'http://www.example.com/path/video.mp4?param1=1&p2=2'
-        output = get_ext(filename_str)
-        self.assertEqual(output, 'mp4')
-
 
 class VideoDescriptorTest(unittest.TestCase):
     """Test for VideoDescriptor"""
 
     def setUp(self):
         system = get_test_descriptor_system()
-        location = Location('i4x://org/course/video/name')
+        location = Location('org', 'course', 'run', 'video', 'name', None)
         self.descriptor = system.construct_xblock_from_class(
             VideoDescriptor,
             scope_ids=ScopeIds(None, None, location, location),
@@ -138,7 +126,7 @@ class VideoDescriptorTest(unittest.TestCase):
         back out to XML.
         """
         system = DummySystem(load_error_modules=True)
-        location = Location(["i4x", "edX", "video", "default", "SampleProblem1"])
+        location = Location("edX", 'course', 'run', "video", 'SampleProblem1', None)
         field_data = DictFieldData({'location': location})
         descriptor = VideoDescriptor(system, field_data, Mock())
         descriptor.youtube_id_0_75 = 'izygArpw-Qo'
@@ -154,7 +142,7 @@ class VideoDescriptorTest(unittest.TestCase):
         in the output string.
         """
         system = DummySystem(load_error_modules=True)
-        location = Location(["i4x", "edX", "video", "default", "SampleProblem1"])
+        location = Location("edX", 'course', 'run', "video", "SampleProblem1", None)
         field_data = DictFieldData({'location': location})
         descriptor = VideoDescriptor(system, field_data, Mock())
         descriptor.youtube_id_0_75 = 'izygArpw-Qo'
@@ -189,12 +177,12 @@ class VideoDescriptorImportTestCase(unittest.TestCase):
               <source src="http://www.example.com/source.mp4"/>
               <source src="http://www.example.com/source.ogg"/>
               <track src="http://www.example.com/track"/>
+              <handout src="http://www.example.com/handout"/>
               <transcript language="ua" src="ukrainian_translation.srt" />
               <transcript language="ge" src="german_translation.srt" />
             </video>
         '''
-        location = Location(["i4x", "edX", "video", "default",
-                             "SampleProblem1"])
+        location = Location("edX", 'course', 'run', "video", "SampleProblem1", None)
         field_data = DictFieldData({
             'data': sample_xml,
             'location': location
@@ -211,6 +199,7 @@ class VideoDescriptorImportTestCase(unittest.TestCase):
             'start_time': datetime.timedelta(seconds=1),
             'end_time': datetime.timedelta(seconds=60),
             'track': 'http://www.example.com/track',
+            'handout': 'http://www.example.com/handout',
             'download_track': True,
             'html5_sources': ['http://www.example.com/source.mp4', 'http://www.example.com/source.ogg'],
             'data': '',
@@ -229,6 +218,7 @@ class VideoDescriptorImportTestCase(unittest.TestCase):
                    end_time="00:01:00">
               <source src="http://www.example.com/source.mp4"/>
               <track src="http://www.example.com/track"/>
+              <handout src="http://www.example.com/handout"/>
               <transcript language="uk" src="ukrainian_translation.srt" />
               <transcript language="de" src="german_translation.srt" />
             </video>
@@ -243,6 +233,7 @@ class VideoDescriptorImportTestCase(unittest.TestCase):
             'start_time': datetime.timedelta(seconds=1),
             'end_time': datetime.timedelta(seconds=60),
             'track': 'http://www.example.com/track',
+            'handout': 'http://www.example.com/handout',
             'download_track': False,
             'download_video': False,
             'html5_sources': ['http://www.example.com/source.mp4'],
@@ -273,6 +264,7 @@ class VideoDescriptorImportTestCase(unittest.TestCase):
             'start_time': datetime.timedelta(seconds=0.0),
             'end_time': datetime.timedelta(seconds=0.0),
             'track': '',
+            'handout': None,
             'download_track': False,
             'download_video': True,
             'html5_sources': ['http://www.example.com/source.mp4'],
@@ -326,6 +318,7 @@ class VideoDescriptorImportTestCase(unittest.TestCase):
             'start_time': datetime.timedelta(seconds=0.0),
             'end_time': datetime.timedelta(seconds=0.0),
             'track': '',
+            'handout': None,
             'download_track': False,
             'download_video': False,
             'html5_sources': [],
@@ -345,7 +338,8 @@ class VideoDescriptorImportTestCase(unittest.TestCase):
                 show_captions="false"
                 download_video="true"
                 sub="&quot;html5_subtitles&quot;"
-                track="&quot;http://download_track&quot;"
+                track="&quot;http://www.example.com/track&quot;"
+                handout="&quot;http://www.example.com/handout&quot;"
                 download_track="true"
                 youtube_id_0_75="&quot;OEoXaMPEzf65&quot;"
                 youtube_id_1_25="&quot;OEoXaMPEzf125&quot;"
@@ -362,7 +356,8 @@ class VideoDescriptorImportTestCase(unittest.TestCase):
             'show_captions': False,
             'start_time': datetime.timedelta(seconds=0.0),
             'end_time': datetime.timedelta(seconds=0.0),
-            'track': 'http://download_track',
+            'track': 'http://www.example.com/track',
+            'handout': 'http://www.example.com/handout',
             'download_track': True,
             'download_video': True,
             'html5_sources': ["source_1", "source_2"],
@@ -386,6 +381,7 @@ class VideoDescriptorImportTestCase(unittest.TestCase):
             'start_time': datetime.timedelta(seconds=0.0),
             'end_time': datetime.timedelta(seconds=0.0),
             'track': '',
+            'handout': None,
             'download_track': False,
             'download_video': False,
             'html5_sources': [],
@@ -489,6 +485,9 @@ class VideoExportTestCase(unittest.TestCase):
     Make sure that VideoDescriptor can export itself to XML
     correctly.
     """
+    def setUp(self):
+        self.location = Location("edX", 'course', 'run', "video", "SampleProblem1", None)
+
     def assertXmlEqual(self, expected, xml):
         for attr in ['tag', 'attrib', 'text', 'tail']:
             self.assertEqual(getattr(expected, attr), getattr(xml, attr))
@@ -498,8 +497,7 @@ class VideoExportTestCase(unittest.TestCase):
     def test_export_to_xml(self):
         """Test that we write the correct XML on export."""
         module_system = DummySystem(load_error_modules=True)
-        location = Location(["i4x", "edX", "video", "default", "SampleProblem1"])
-        desc = VideoDescriptor(module_system, DictFieldData({}), ScopeIds(None, None, location, location))
+        desc = VideoDescriptor(module_system, DictFieldData({}), ScopeIds(None, None, self.location, self.location))
 
         desc.youtube_id_0_75 = 'izygArpw-Qo'
         desc.youtube_id_1_0 = 'p2Q6BrNhdh8'
@@ -509,6 +507,7 @@ class VideoExportTestCase(unittest.TestCase):
         desc.start_time = datetime.timedelta(seconds=1.0)
         desc.end_time = datetime.timedelta(seconds=60)
         desc.track = 'http://www.example.com/track'
+        desc.handout = 'http://www.example.com/handout'
         desc.download_track = True
         desc.html5_sources = ['http://www.example.com/source.mp4', 'http://www.example.com/source.ogg']
         desc.download_video = True
@@ -520,6 +519,7 @@ class VideoExportTestCase(unittest.TestCase):
            <source src="http://www.example.com/source.mp4"/>
            <source src="http://www.example.com/source.ogg"/>
            <track src="http://www.example.com/track"/>
+           <handout src="http://www.example.com/handout"/>
            <transcript language="ge" src="german_translation.srt" />
            <transcript language="ua" src="ukrainian_translation.srt" />
          </video>
@@ -529,8 +529,7 @@ class VideoExportTestCase(unittest.TestCase):
     def test_export_to_xml_empty_end_time(self):
         """Test that we write the correct XML on export."""
         module_system = DummySystem(load_error_modules=True)
-        location = Location(["i4x", "edX", "video", "default", "SampleProblem1"])
-        desc = VideoDescriptor(module_system, DictFieldData({}), ScopeIds(None, None, location, location))
+        desc = VideoDescriptor(module_system, DictFieldData({}), ScopeIds(None, None, self.location, self.location))
 
         desc.youtube_id_0_75 = 'izygArpw-Qo'
         desc.youtube_id_1_0 = 'p2Q6BrNhdh8'
@@ -558,10 +557,39 @@ class VideoExportTestCase(unittest.TestCase):
     def test_export_to_xml_empty_parameters(self):
         """Test XML export with defaults."""
         module_system = DummySystem(load_error_modules=True)
-        location = Location(["i4x", "edX", "video", "default", "SampleProblem1"])
-        desc = VideoDescriptor(module_system, DictFieldData({}), ScopeIds(None, None, location, location))
+        desc = VideoDescriptor(module_system, DictFieldData({}), ScopeIds(None, None, self.location, self.location))
 
         xml = desc.definition_to_xml(None)
         expected = '<video url_name="SampleProblem1"/>\n'
 
         self.assertEquals(expected, etree.tostring(xml, pretty_print=True))
+
+
+class VideoCdnTest(unittest.TestCase):
+    """
+    Tests for Video CDN.
+    """
+    @patch('requests.get')
+    def test_get_video_success(self, cdn_response):
+        """
+        Test successful CDN request.
+        """
+        original_video_url = "http://www.original_video.com/original_video.mp4"
+        cdn_response_video_url = "http://www.cdn_video.com/cdn_video.mp4"
+        cdn_response_content = '{{"sources":["{cdn_url}"]}}'.format(cdn_url=cdn_response_video_url)
+        cdn_response.return_value=Mock(status_code=200, content=cdn_response_content)
+        fake_cdn_url = 'http://fake_cdn.com/'
+        self.assertEqual(
+            get_video_from_cdn(fake_cdn_url, original_video_url),
+            cdn_response_video_url
+        )
+
+    @patch('requests.get')
+    def test_get_no_video_exists(self, cdn_response):
+        """
+        Test if no alternative video in CDN exists.
+        """
+        original_video_url = "http://www.original_video.com/original_video.mp4"
+        cdn_response.return_value=Mock(status_code=404)
+        fake_cdn_url = 'http://fake_cdn.com/'
+        self.assertIsNone(get_video_from_cdn(fake_cdn_url, original_video_url))

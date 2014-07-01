@@ -20,7 +20,7 @@ from status.status import get_site_status_msg
 <%block cached="False">
 <%
 try:
-    course_id = course.id
+    course_id = course.id.to_deprecated_string()
 except:
     # can't figure out a better way to get at a possibly-defined course var
     course_id = None
@@ -81,7 +81,7 @@ site_status_msg = get_site_status_msg(course_id)
         <ol class="user">
           <li class="primary">
             <a class="shopping-cart" href="${reverse('shoppingcart.views.show_cart')}">
-              <i class="icon-shopping-cart"></i> Shopping Cart
+              <i class="icon-shopping-cart"></i> ${_("Shopping Cart")}
             </a>
           </li>
         </ol>
@@ -104,7 +104,7 @@ site_status_msg = get_site_status_msg(course_id)
       % if not settings.FEATURES['DISABLE_LOGIN_BUTTON']:
           % if course and settings.FEATURES.get('RESTRICT_ENROLL_BY_REG_METHOD') and course.enrollment_domain:
           <li class="nav-global-04">
-            <a class="cta cta-register" href="${reverse('course-specific-register', args=[course.id])}">${_("Register Now")}</a>
+            <a class="cta cta-register" href="${reverse('course-specific-register', args=[course.id.to_deprecated_string()])}">${_("Register Now")}</a>
           </li>
           % else:
           <li class="nav-global-04">
@@ -118,7 +118,7 @@ site_status_msg = get_site_status_msg(course_id)
     <li class="nav-courseware-01">
       % if not settings.FEATURES['DISABLE_LOGIN_BUTTON']:
           % if course and settings.FEATURES.get('RESTRICT_ENROLL_BY_REG_METHOD') and course.enrollment_domain:
-          <a class="cta cta-login" href="${reverse('course-specific-login', args=[course.id])}${login_query()}">${_("Log in")}</a>
+          <a class="cta cta-login" href="${reverse('course-specific-login', args=[course.id.to_deprecated_string()])}${login_query()}">${_("Log in")}</a>
           % else:
           <a class="cta cta-login" href="/login${login_query()}">${_("Log in")}</a>
           % endif
@@ -129,7 +129,7 @@ site_status_msg = get_site_status_msg(course_id)
   </nav>
 </header>
 % if course:
-<!--[if IE]>
+<!--[if lte IE 8]>
 <div class="ie-banner" aria-hidden="true">${_('<strong>Warning:</strong> Your browser is not fully supported. We strongly recommend using {chrome_link_start}Chrome{chrome_link_end} or {ff_link_start}Firefox{ff_link_end}.').format(chrome_link_start='<a href="https://www.google.com/intl/en/chrome/browser/" target="_blank">', chrome_link_end='</a>', ff_link_start='<a href="http://www.mozilla.org/en-US/firefox/new/" target="_blank">', ff_link_end='</a>')}</div>
 <![endif]-->
 % endif

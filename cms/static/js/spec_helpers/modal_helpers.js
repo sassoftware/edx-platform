@@ -1,26 +1,20 @@
 /**
  * Provides helper methods for invoking Studio modal windows in Jasmine tests.
  */
-define(["jquery"],
-    function($) {
-        var basicModalTemplate = readFixtures('basic-modal.underscore'),
-            modalButtonTemplate = readFixtures('modal-button.underscore'),
-            feedbackTemplate = readFixtures('system-feedback.underscore'),
-            installModalTemplates,
+define(["jquery", "js/spec_helpers/view_helpers"],
+    function($, view_helpers) {
+        var installModalTemplates,
             getModalElement,
             isShowingModal,
             hideModalIfShowing,
+            pressModalButton,
             cancelModal,
             cancelModalIfShowing;
 
         installModalTemplates = function(append) {
-            if (append) {
-                appendSetFixtures($("<script>", { id: "system-feedback-tpl", type: "text/template" }).text(feedbackTemplate));
-            } else {
-                setFixtures($("<script>", { id: "system-feedback-tpl", type: "text/template" }).text(feedbackTemplate));
-            }
-            appendSetFixtures($("<script>", { id: "basic-modal-tpl", type: "text/template" }).text(basicModalTemplate));
-            appendSetFixtures($("<script>", { id: "modal-button-tpl", type: "text/template" }).text(modalButtonTemplate));
+            view_helpers.installViewTemplates(append);
+            view_helpers.installTemplate('basic-modal');
+            view_helpers.installTemplate('modal-button');
         };
 
         getModalElement = function(modal) {
@@ -31,6 +25,11 @@ define(["jquery"],
                 modalElement = $('.wrapper-modal-window');
             }
             return modalElement;
+        };
+
+        getModalTitle = function(modal) {
+            var modalElement = getModalElement(modal);
+            return modalElement.find('.modal-window-title').text();
         };
 
         isShowingModal = function(modal) {
@@ -44,12 +43,16 @@ define(["jquery"],
             }
         };
 
-        cancelModal = function(modal) {
-            var modalElement, cancelButton;
+        pressModalButton = function(selector, modal) {
+            var modalElement, button;
             modalElement = getModalElement(modal);
-            cancelButton = modalElement.find('.action-cancel');
-            expect(cancelButton.length).toBe(1);
-            cancelButton.click();
+            button = modalElement.find(selector + ':visible');
+            expect(button.length).toBe(1);
+            button.click();
+        };
+
+        cancelModal = function(modal) {
+            pressModalButton('.action-cancel', modal);
         };
 
         cancelModalIfShowing = function(modal) {
@@ -58,11 +61,14 @@ define(["jquery"],
             }
         };
 
-        return {
+        return $.extend(view_helpers, {
+            'getModalElement': getModalElement,
+            'getModalTitle': getModalTitle,
             'installModalTemplates': installModalTemplates,
             'isShowingModal': isShowingModal,
             'hideModalIfShowing': hideModalIfShowing,
+            'pressModalButton': pressModalButton,
             'cancelModal': cancelModal,
             'cancelModalIfShowing': cancelModalIfShowing
-        };
+        });
     });

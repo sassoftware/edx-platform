@@ -18,7 +18,6 @@
 
     .modal-content {
       position: relative;
-      box-shadow: 0 0 3px $shadow-d1;
       background-color: $white;
       padding: 5%;
     }
@@ -52,7 +51,9 @@
       }
     }
 
+    // TODO: need to sync up (alongside general editing mode) with xblocks.scss UI
     .modal-chin,
+    .xblock-actions,
     .modal-actions {
       padding: ($baseline*0.75) 2% ($baseline/2) 2%;
 
@@ -106,7 +107,7 @@
 
   // large modals - component editors and interactives
   .modal-lg {
-    width: 75%;
+    width: 70%;
     min-width: ($baseline*27.5);
     height: auto;
 
@@ -187,6 +188,24 @@
           max-height: none;
         }
       }
+    }
+  }
+
+  // xblock custom actions
+  .modal-window .editor-with-buttons {
+    margin-bottom: ($baseline*3);
+
+    // temporary fix until xblock structure is set
+    &.wrapper-comp-settings .list-input.settings-list {
+      height: 375px;
+    }
+
+    // TODO: need to sync up (alongside general editing mode) with xblocks.scss UI
+    .xblock-actions {
+      background-color: $gray-l4;
+      position: absolute;
+      width: 100%;
+      bottom: 0;
     }
   }
 

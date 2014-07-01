@@ -37,8 +37,10 @@ from lms.lib.xblock.mixin import LmsBlockMixin
 
 ################################### FEATURES ###################################
 # The display name of the platform to be used in templates/emails/etc.
-PLATFORM_NAME = "edX"
+PLATFORM_NAME = "Your Platform Name Here"
 CC_MERCHANT_NAME = PLATFORM_NAME
+PLATFORM_TWITTER_ACCOUNT = "@YourPlatformTwitterAccount"
+PLATFORM_FACEBOOK_ACCOUNT = "http://www.facebook.com/YourPlatformFacebookAccount"
 
 COURSEWARE_ENABLED = True
 ENABLE_JASMINE = False
@@ -119,9 +121,6 @@ FEATURES = {
     # Enables ability to restrict enrollment in specific courses by the user account login method
     'RESTRICT_ENROLL_BY_REG_METHOD': False,
 
-    # analytics experiments
-    'ENABLE_INSTRUCTOR_ANALYTICS': False,
-
     # Enables the LMS bulk email feature for course staff
     'ENABLE_INSTRUCTOR_EMAIL': True,
     # If True and ENABLE_INSTRUCTOR_EMAIL: Forces email to be explicitly turned on
@@ -130,11 +129,14 @@ FEATURES = {
     #   for all Mongo-backed courses.
     'REQUIRE_COURSE_EMAIL_AUTH': True,
 
+    # Analytics experiments - shows instructor analytics tab in LMS instructor dashboard.
+    # Enabling this feature depends on installation of a separate analytics server.
+    'ENABLE_INSTRUCTOR_ANALYTICS': False,
+
     # enable analytics server.
     # WARNING: THIS SHOULD ALWAYS BE SET TO FALSE UNDER NORMAL
     # LMS OPERATION. See analytics.py for details about what
     # this does.
-
     'RUN_AS_ANALYTICS_SERVER_ENABLED': False,
 
     # Flip to True when the YouTube iframe API breaks (again)
@@ -169,8 +171,13 @@ FEATURES = {
     # Enable instructor to assign individual due dates
     'INDIVIDUAL_DUE_DATES': False,
 
-    # Enable instructor dash beta version link
-    'ENABLE_INSTRUCTOR_BETA_DASHBOARD': True,
+    # Enable legacy instructor dashboard
+    'ENABLE_INSTRUCTOR_LEGACY_DASHBOARD': True,
+    # Is this an edX-owned domain? (used on instructor dashboard)
+    'IS_EDX_DOMAIN': False,
+
+    # Toggle to enable certificates of courses on dashboard
+    'ENABLE_VERIFIED_CERTIFICATES': False,
 
     # Allow use of the hint managment instructor view.
     'ENABLE_HINTER_INSTRUCTOR_VIEW': False,
@@ -220,8 +227,11 @@ FEATURES = {
     # Hide any Personally Identifiable Information from application logs
     'SQUELCH_PII_IN_LOGS': False,
 
-    # Toggle embargo functionality
+    # Toggles the embargo functionality, which enable embargoing for particular courses
     'EMBARGO': False,
+
+    # Toggles the embargo site functionality, which enable embargoing for the whole site
+    'SITE_EMBARGOED': False,
 
     # Whether the Wiki subsystem should be accessible via the direct /wiki/ paths. Setting this to True means
     # that people can submit content and modify the Wiki in any arbitrary manner. We're leaving this as True in the
@@ -243,6 +253,10 @@ FEATURES = {
 
     # Turn off Advanced Security by default
     'ADVANCED_SECURITY': False,
+
+    # Show a "Download your certificate" on the Progress page if the lowest
+    # nonzero grade cutoff is met
+    'SHOW_PROGRESS_SUCCESS_BUTTON': False,
 }
 
 # Used for A/B testing
@@ -347,8 +361,6 @@ LIB_URL = '/static/js/'
 # Dev machines shouldn't need the book
 # BOOK_URL = '/static/book/'
 BOOK_URL = 'https://mitxstatic.s3.amazonaws.com/book_images/'  # For AWS deploys
-# RSS_URL = r'lms/templates/feed.rss'
-# PRESS_URL = r''
 RSS_TIMEOUT = 600
 
 # Configuration option for when we want to grab server error pages
@@ -390,7 +402,7 @@ LMS_MIGRATION_ALLOWED_IPS = []
 ############################## EVENT TRACKING #################################
 
 # FIXME: Should we be doing this truncation?
-TRACK_MAX_EVENT = 10000
+TRACK_MAX_EVENT = 50000
 
 DEBUG_TRACK_LOG = False
 
@@ -403,19 +415,43 @@ TRACKING_BACKENDS = {
     }
 }
 
+# We're already logging events, and we don't want to capture user
+# names/passwords.  Heartbeat events are likely not interesting.
+TRACKING_IGNORE_URL_PATTERNS = [r'^/event', r'^/login', r'^/heartbeat']
+
+EVENT_TRACKING_ENABLED = True
+EVENT_TRACKING_BACKENDS = {
+    'logger': {
+        'ENGINE': 'eventtracking.backends.logger.LoggerBackend',
+        'OPTIONS': {
+            'name': 'tracking',
+            'max_event_size': TRACK_MAX_EVENT,
+        }
+    }
+}
+EVENT_TRACKING_PROCESSORS = [
+    {
+        'ENGINE': 'track.shim.LegacyFieldMappingProcessor'
+    }
+]
+
 # Backwards compatibility with ENABLE_SQL_TRACKING_LOGS feature flag.
-# In the future, adding the backend to TRACKING_BACKENDS enough.
+# In the future, adding the backend to TRACKING_BACKENDS should be enough.
 if FEATURES.get('ENABLE_SQL_TRACKING_LOGS'):
     TRACKING_BACKENDS.update({
         'sql': {
             'ENGINE': 'track.backends.django.DjangoBackend'
         }
     })
+    EVENT_TRACKING_BACKENDS.update({
+        'sql': {
+            'ENGINE': 'track.backends.django.DjangoBackend'
+        }
+    })
 
-# We're already logging events, and we don't want to capture user
-# names/passwords.  Heartbeat events are likely not interesting.
-TRACKING_IGNORE_URL_PATTERNS = [r'^/event', r'^/login', r'^/heartbeat']
-TRACKING_ENABLED = True
+######################## GOOGLE ANALYTICS ###########################
+GOOGLE_ANALYTICS_ACCOUNT = None
+GOOGLE_ANALYTICS_LINKEDIN = 'GOOGLE_ANALYTICS_LINKEDIN_DUMMY'
 
 ######################## subdomain specific settings ###########################
 COURSE_LISTINGS = {}
@@ -489,10 +525,9 @@ CMS_BASE = 'localhost:8001'
 
 # Site info
 SITE_ID = 1
-SITE_NAME = "edx.org"
+SITE_NAME = "example.com"
 HTTPS = 'on'
 ROOT_URLCONF = 'lms.urls'
-IGNORABLE_404_ENDS = ('favicon.ico')
 # NOTE: Please set ALLOWED_HOSTS to some sane value, as we do not allow the default '*'
 
 # Platform Email
@@ -503,6 +538,8 @@ SERVER_EMAIL = 'devops@example.com'
 TECH_SUPPORT_EMAIL = 'technical@example.com'
 CONTACT_EMAIL = 'info@example.com'
 BUGS_EMAIL = 'bugs@example.com'
+UNIVERSITY_EMAIL = 'university@example.com'
+PRESS_EMAIL = 'press@example.com'
 ADMINS = ()
 MANAGERS = ADMINS
 
@@ -523,71 +560,78 @@ TIME_ZONE = 'America/New_York'  # http://en.wikipedia.org/wiki/List_of_tz_zones_
 LANGUAGE_CODE = 'en'  # http://www.i18nguy.com/unicode/language-identifiers.html
 
 # Sourced from http://www.localeplanet.com/icu/ and wikipedia
-# Languages that don't have any reviewed strings are commented out;
-# see https://www.transifex.com/projects/p/edx-platform/
 LANGUAGES = (
     ('en', u'English'),
     ('eo', u'Dummy Language (Esperanto)'),  # Dummy languaged used for testing
     ('fake2', u'Fake translations'),        # Another dummy language for testing (not pushed to prod)
 
+    ('am', u'አማርኛ'),  # Amharic
     ('ar', u'العربية'),  # Arabic
-#    ('az', u'azərbaycanca'),  # Azerbaijani
-#    ('bg-bg', u'български (България)'),  # Bulgarian (Bulgaria)
-#    ('bn', u'বাংলা'),  # Bengali
-#    ('bn-bd', u'বাংলা (বাংলাদেশ)'),  # Bengali (Bangladesh)
-#    ('bs', u'bosanski'),  # Bosnian
+    ('az', u'azərbaycanca'),  # Azerbaijani
+    ('bg-bg', u'български (България)'),  # Bulgarian (Bulgaria)
+    ('bn-bd', u'বাংলা (বাংলাদেশ)'),  # Bengali (Bangladesh)
+    ('bn-in', u'বাংলা (ভারত)'),  # Bengali (India)
+    ('bs', u'bosanski'),  # Bosnian
     ('ca', u'Català'),  # Catalan
-#    ('ca@valencia', u'Català (València)'),  # Catalan (Valencia)
+    ('ca@valencia', u'Català (València)'),  # Catalan (Valencia)
     ('cs', u'Čeština'),  # Czech
-#    ('cy', u'Cymraeg'),  # Welsh
+    ('cy', u'Cymraeg'),  # Welsh
+    ('da', u'dansk'),  # Danish
     ('de-de', u'Deutsch (Deutschland)'),  # German (Germany)
-#    ('el', u'Ελληνικά'),  # Greek
+    ('el', u'Ελληνικά'),  # Greek
     ('en@lolcat', u'LOLCAT English'),  # LOLCAT English
     ('en@pirate', u'Pirate English'),  # Pirate English
     ('es-419', u'Español (Latinoamérica)'),  # Spanish (Latin America)
-#    ('es-ar', u'Español (Argentina)'),  # Spanish (Argentina)
-#    ('es-ec', u'Español (Ecuador)'),  # Spanish (Ecuador)
-#    ('es-es', u'Español (España)'),  # Spanish (Spain)
-#    ('es-mx', u'Español (México)'),  # Spanish (Mexico)
-#    ('es-pe', u'Español (Perú)'),  # Spanish (Peru)
-#    ('es-us', u'Español (Estados Unidos)'),  # Spanish (United States)
-#    ('et-ee', u'Eesti (Eesti)'),  # Estonian (Estonia)
-#    ('eu-es', u'euskara (Espainia)'),  # Basque (Spain)
-#    ('fa', u'فارسی'),  # Persian
-#    ('fa-ir', u'فارسی (ایران)'),  # Persian (Iran)
-#    ('fi-fi', u'Suomi (Suomi)'),  # Finnish (Finland)
+    ('es-ar', u'Español (Argentina)'),  # Spanish (Argentina)
+    ('es-ec', u'Español (Ecuador)'),  # Spanish (Ecuador)
+    ('es-es', u'Español (España)'),  # Spanish (Spain)
+    ('es-mx', u'Español (México)'),  # Spanish (Mexico)
+    ('es-pe', u'Español (Perú)'),  # Spanish (Peru)
+    ('et-ee', u'Eesti (Eesti)'),  # Estonian (Estonia)
+    ('eu-es', u'euskara (Espainia)'),  # Basque (Spain)
+    ('fa', u'فارسی'),  # Persian
+    ('fa-ir', u'فارسی (ایران)'),  # Persian (Iran)
+    ('fi-fi', u'Suomi (Suomi)'),  # Finnish (Finland)
     ('fr', u'Français'),  # French
-#    ('gl', u'Galego'),  # Galician
-#    ('he', u'עברית'),  # Hebrew
+    ('gl', u'Galego'),  # Galician
+    ('gu', u'ગુજરાતી'),  # Gujarati
+    ('he', u'עברית'),  # Hebrew
     ('hi', u'हिन्दी'),  # Hindi
-#    ('hu', u'magyar'),  # Hungarian
-    ('hy-am', u'Հայերէն (Հայաստանի Հանրապետութիւն)'),  # Armenian (Armenia)
+    ('hr', u'hrvatski'),  # Croatian
+    ('hu', u'magyar'),  # Hungarian
+    ('hy-am', u'Հայերեն (Հայաստան)'),  # Armenian (Armenia)
     ('id', u'Bahasa Indonesia'),  # Indonesian
     ('it-it', u'Italiano (Italia)'),  # Italian (Italy)
-    ('ja-jp', u'日本語(日本)'),  # Japanese (Japan)
-#    ('km-kh', u'ភាសាខ្មែរ (កម្ពុជា)'),  # Khmer (Cambodia)
-    ('ko-kr', u'한국어(대한민국)'),  # Korean (Korea)
+    ('ja-jp', u'日本語 (日本)'),  # Japanese (Japan)
+    ('kk-kz', u'қазақ тілі (Қазақстан)'),  # Kazakh (Kazakhstan)
+    ('km-kh', u'ភាសាខ្មែរ (កម្ពុជា)'),  # Khmer (Cambodia)
+    ('kn', u'ಕನ್ನಡ'),  # Kannada
+    ('ko-kr', u'한국어 (대한민국)'),  # Korean (Korea)
     ('lt-lt', u'Lietuvių (Lietuva)'),  # Lithuanian (Lithuania)
-#    ('ml', u'മലയാളം'),  # Malayalam
-#    ('mn', u'Монгол хэл'),  # Mongolian
-#    ('ms', u'Bahasa Melayu'),  # Malay
+    ('ml', u'മലയാളം'),  # Malayalam
+    ('mn', u'Монгол хэл'),  # Mongolian
+    ('ms', u'Bahasa Melayu'),  # Malay
     ('nb', u'Norsk bokmål'),  # Norwegian Bokmål
-#    ('ne', u'नेपाली'),  # Nepali
+    ('ne', u'नेपाली'),  # Nepali
     ('nl-nl', u'Nederlands (Nederland)'),  # Dutch (Netherlands)
+    ('or', u'ଓଡ଼ିଆ'),  # Oriya
     ('pl', u'Polski'),  # Polish
     ('pt-br', u'Português (Brasil)'),  # Portuguese (Brazil)
-#    ('pt-pt', u'Português (Portugal)'),  # Portuguese (Portugal)
-#    ('ru', u'Русский'),  # Russian
-#    ('si', u'සිංහල'),  # Sinhala
-#    ('sk', u'Slovenčina'),  # Slovak
+    ('pt-pt', u'Português (Portugal)'),  # Portuguese (Portugal)
+    ('ro', u'română'),  # Romanian
+    ('ru', u'Русский'),  # Russian
+    ('si', u'සිංහල'),  # Sinhala
+    ('sk', u'Slovenčina'),  # Slovak
     ('sl', u'Slovenščina'),  # Slovenian
-#    ('th', u'ไทย'),  # Thai
+    ('ta', u'தமிழ்'),  # Tamil
+    ('th', u'ไทย'),  # Thai
     ('tr-tr', u'Türkçe (Türkiye)'),  # Turkish (Turkey)
     ('uk', u'Українська'),  # Ukranian
-#    ('ur', u'اردو'),  # Urdu
+    ('ur', u'اردو'),  # Urdu
     ('vi', u'Tiếng Việt'),  # Vietnamese
-    ('zh-cn', u'中文(简体)'),  # Chinese (China)
-    ('zh-tw', u'中文(台灣)'),  # Chinese (Taiwan)
+    ('zh-cn', u'中文 (简体)'),  # Chinese (China)
+    ('zh-hk', u'中文 (香港)'),  # Chinese (Hong Kong)
+    ('zh-tw', u'中文 (台灣)'),  # Chinese (Taiwan)
 )
 
 LANGUAGE_DICT = dict(LANGUAGES)
@@ -644,6 +688,9 @@ FEEDBACK_SUBMISSION_EMAIL = None
 ZENDESK_URL = None
 ZENDESK_USER = None
 ZENDESK_API_KEY = None
+
+##### EMBARGO #####
+EMBARGO_SITE_REDIRECT_URL = None
 
 ##### shoppingcart Payment #####
 PAYMENT_SUPPORT_EMAIL = 'payment@example.com'
@@ -737,6 +784,7 @@ MIDDLEWARE_CLASSES = (
 
     # Allows us to dark-launch particular languages
     'dark_lang.middleware.DarkLangMiddleware',
+    'geoinfo.middleware.CountryMiddleware',
     'embargo.middleware.EmbargoMiddleware',
 
     # Allows us to set user preferences
@@ -797,16 +845,19 @@ main_vendor_js = [
     'js/vendor/swfobject/swfobject.js',
     'js/vendor/jquery.ba-bbq.min.js',
     'js/vendor/ova/annotator-full.js',
+    'js/vendor/ova/annotator-full-firebase-auth.js',
     'js/vendor/ova/video.dev.js',
     'js/vendor/ova/vjs.youtube.js',
     'js/vendor/ova/rangeslider.js',
     'js/vendor/ova/share-annotator.js',
-    'js/vendor/ova/tinymce.full.min.js',
     'js/vendor/ova/richText-annotator.js',
     'js/vendor/ova/reply-annotator.js',
     'js/vendor/ova/tags-annotator.js',
     'js/vendor/ova/flagging-annotator.js',
+    'js/vendor/ova/diacritic-annotator.js',
     'js/vendor/ova/jquery-Watch.js',
+    'js/vendor/ova/openseadragon.js',
+    'js/vendor/ova/OpenSeaDragonAnnotation.js',
     'js/vendor/ova/ova.js',
     'js/vendor/ova/catch/js/catch.js',
     'js/vendor/ova/catch/js/handlebars-1.1.2.js',
@@ -826,14 +877,15 @@ PIPELINE_CSS = {
             'css/vendor/jquery.qtip.min.css',
             'css/vendor/responsive-carousel/responsive-carousel.css',
             'css/vendor/responsive-carousel/responsive-carousel.slide.css',
-            'css/vendor/ova/edx-annotator.css',
             'css/vendor/ova/annotator.css',
+            'css/vendor/ova/edx-annotator.css',
             'css/vendor/ova/video-js.min.css',
             'css/vendor/ova/rangeslider.css',
             'css/vendor/ova/share-annotator.css',
             'css/vendor/ova/richText-annotator.css',
             'css/vendor/ova/tags-annotator.css',
             'css/vendor/ova/flagging-annotator.css',
+            'css/vendor/ova/diacritic-annotator.css',
             'css/vendor/ova/ova.css',
             'js/vendor/ova/catch/css/main.css'
         ],
@@ -1056,7 +1108,6 @@ BULK_EMAIL_DEFAULT_FROM_EMAIL = 'no-reply@example.com'
 
 # Parameters for breaking down course enrollment into subtasks.
 BULK_EMAIL_EMAILS_PER_TASK = 100
-BULK_EMAIL_EMAILS_PER_QUERY = 1000
 
 # Initial delay used for retrying tasks.  Additional retries use
 # longer delays.  Value is in seconds.
@@ -1288,6 +1339,11 @@ GRADES_DOWNLOAD = {
     'ROOT_PATH': '/tmp/edx-s3/grades',
 }
 
+######################## PROGRESS SUCCESS BUTTON ##############################
+# The following fields are available in the URL: {course_id} {student_id}
+PROGRESS_SUCCESS_BUTTON_URL = 'http://<domain>/<path>/{course_id}'
+PROGRESS_SUCCESS_BUTTON_TEXT_OVERRIDE = None
+
 #### PASSWORD POLICY SETTINGS #####
 
 PASSWORD_MIN_LENGTH = None
@@ -1306,6 +1362,12 @@ LINKEDIN_API = {
     'EMAIL_WHITELIST': [],
     'COMPANY_ID': '2746406',
 }
+
+
+############################ ORA 2 ############################################
+
+# By default, don't use a file prefix
+ORA2_FILE_PREFIX = None
 
 
 ##### ACCOUNT LOCKOUT DEFAULT PARAMETERS #####

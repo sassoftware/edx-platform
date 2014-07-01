@@ -1,7 +1,6 @@
 from xblock.fields import Scope
 
 from contentstore.utils import get_modulestore
-from cms.lib.xblock.mixin import CmsBlockMixin
 
 
 class CourseMetadata(object):
@@ -11,6 +10,7 @@ class CourseMetadata(object):
     The objects have no predefined attrs but instead are obj encodings of the
     editable metadata.
     '''
+    # The list of fields that wouldn't be shown in Advanced Settings.
     FILTERED_LIST = ['xml_attributes',
                      'start',
                      'end',
@@ -22,6 +22,7 @@ class CourseMetadata(object):
                      'show_timezone',
                      'format',
                      'graded',
+                     'video_speed_optimizations',
     ]
 
     @classmethod
@@ -33,9 +34,6 @@ class CourseMetadata(object):
         result = {}
 
         for field in descriptor.fields.values():
-            if field.name in CmsBlockMixin.fields:
-                continue
-
             if field.scope != Scope.settings:
                 continue
 
