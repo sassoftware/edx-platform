@@ -1,0 +1,15 @@
+# .coveragerc for common/lib/badgekit
+[run]
+data_file = reports/common/lib/badgekit/.coverage
+source = common/lib/badgekit
+branch = true
+
+[report]
+ignore_errors = True
+
+[html]
+title = Calc Python Test Coverage Report
+directory = reports/common/lib/badgekit/cover
+
+[xml]
+output = reports/common/lib/badgekit/coverage.xml
