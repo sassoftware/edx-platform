@@ -257,6 +257,7 @@ FEATURES = {
     # Show a "Download your certificate" on the Progress page if the lowest
     # nonzero grade cutoff is met
     'SHOW_PROGRESS_SUCCESS_BUTTON': False,
+    'ENABLE_STUDENT_BADGE_DISPLAY_COURSEWARE': True,
 }
 
 # Used for A/B testing

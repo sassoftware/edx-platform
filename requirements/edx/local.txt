@@ -1,5 +1,6 @@
 # Python libraries to install that are local to the edx-platform repo
 -e .
+-e common/lib/badgekit
 -e common/lib/calc
 -e common/lib/capa
 -e common/lib/chem

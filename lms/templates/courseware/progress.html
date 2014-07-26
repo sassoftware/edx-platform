@@ -68,6 +68,32 @@ from django.conf import settings
         <div id="grade-detail-graph" aria-hidden="true"></div>
       %endif
 
+
+      %if settings.FEATURES.get("ENABLE_STUDENT_BADGE_DISPLAY_COURSEWARE"):
+
+        <div class="chapters">
+        <section>
+          <h2>Badges Earned</h2>
+          <div class="sections">
+            <div class="ui-badges" id="badges"> 
+               <div class="badges_scrollbar">
+               &nbsp;&nbsp;&nbsp;&nbsp;
+               %for i, item in enumerate(('spam', 'ham', 'eggs', 'xlk', 'eggs', 'beef', 'other', 'not', 'only', 'meat', 'bread','pickles')):
+                 %for studentbadge in studentbadges: 
+                   <div class="badgelet"> 
+                       <a href="#badge-${studentbadge['badge']['slug']}" title="Creative Solution"  data-tooltip="${studentbadge['badge']['consumerDescription']}" ><img id="badge-${studentbadge['badge']['slug']}" height=100px src="${studentbadge['badge']['imageUrl']}" class="badgelet"  /></a>
+                       <p>${studentbadge['badge']['name']}</p>
+
+                   </div> 
+                  %endfor
+                %endfor
+              </div>
+            </div>
+          </div>
+        </section>
+        </div>
+      %endif      
+
       <div class="chapters">
         %for chapter in courseware_summary:
         %if not chapter['display_name'] == "hidden":

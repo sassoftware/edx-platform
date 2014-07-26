@@ -41,6 +41,7 @@
 // base - elements
 @import 'elements/typography';
 @import 'elements/controls';
+@import 'elements/badges';
 
 // shared - platform
 @import 'multicourse/home';

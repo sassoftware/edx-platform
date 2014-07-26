@@ -67,6 +67,7 @@ Babel==1.3
 transifex-client==0.9.1
 
 
+-e common/lib/badgekit
 -e common/lib/calc
 -e common/lib/capa
 -e common/lib/chem

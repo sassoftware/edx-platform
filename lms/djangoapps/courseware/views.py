@@ -48,6 +48,9 @@ from opaque_keys import InvalidKeyError
 
 from microsite_configuration import microsite
 from opaque_keys.edx.locations import SlashSeparatedCourseKey
+import inspect
+
+from badgekit import api
 
 log = logging.getLogger("edx.courseware")
 
@@ -737,6 +740,13 @@ def _progress(request, course_key, student_id):
 
     # The pre-fetching of groups is done to make auth checks not require an
     # additional DB lookup (this kills the Progress page in particular).
+    courseslug = course.id._to_string().split("+")[2]
+    studentemail = student.email
+    print("***Course Slug is: ", course.id._to_string().split("+")[2])
+    print("Student email is:", student.email)
+    ##print("Student badges are: ",get_student_badges("http://149.173.27.52:8080/","sas-mooc", courseslug,studentemail, 'yoursecret'))
+    studentbadges = get_student_badges("http://149.173.27.52:8080/","sas-mooc", courseslug,studentemail, 'yoursecret')['instances']
+    print("Image URL is ",studentbadges[0]['badge']['imageUrl'])
     student = User.objects.prefetch_related("groups").get(id=student.id)
 
     courseware_summary = grades.progress_summary(student, request, course)
@@ -754,6 +764,7 @@ def _progress(request, course_key, student_id):
         'grade_summary': grade_summary,
         'staff_access': staff_access,
         'student': student,
+        'studentbadges': studentbadges,
         'reverifications': fetch_reverify_banner_info(request, course_key)
     }
 
@@ -761,6 +772,12 @@ def _progress(request, course_key, student_id):
         response = render_to_response('courseware/progress.html', context)
 
     return response
+
+def get_student_badges(host, issuer, program, email, secret):
+    print("!!! Now to connect to badgekit  - ", host, secret,issuer,program,email)
+    a = api.BadgeKitAPI(host, secret)
+    badges = a.get(system='badgekit',issuer=issuer,program=program,instance=email)
+    return badges
 
 
 def fetch_reverify_banner_info(request, course_key):
