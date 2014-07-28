@@ -745,7 +745,7 @@ def _progress(request, course_key, student_id):
     print("***Course Slug is: ", course.id._to_string().split("+")[2])
     print("Student email is:", student.email)
     ##print("Student badges are: ",get_student_badges("http://149.173.27.52:8080/","sas-mooc", courseslug,studentemail, 'yoursecret'))
-    studentbadges = get_student_badges("http://149.173.27.52:8080/","sas-mooc", courseslug,studentemail, 'yoursecret')['instances']
+    studentbadges = get_student_badges("http://149.173.31.143:8080/","sas-mooc", courseslug,studentemail, 'yoursecret')['instances']
     print("Image URL is ",studentbadges[0]['badge']['imageUrl'])
     student = User.objects.prefetch_related("groups").get(id=student.id)
 
