@@ -1,0 +1,1 @@
+class Badges.Models.BadgeInstance extends Backbone.Model

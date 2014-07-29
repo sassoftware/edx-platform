@@ -1,0 +1,5 @@
+		div class="badgelet"> 
+                       <a href="#badge-<%= student_badgeinstance.badgeslug %>" title="<%= student_badgeinstance.name %>"  data-tooltip="<%= student_badgeinstance.consumerDescription %>" ><img id="badge-<%= student_badgeinstance.badgeslug %>" height=100px src="<%= student_badgeinstance.imageUrl %>" class="badgelet"  /></a>
+                       <p><%= student_badgeinstance.name %></p>
+
+        </div> 

@@ -4,7 +4,20 @@
 
 <%block name="headextra">
 <%static:css group='style-course-vendor'/>
-<%static:css group='style-course'/>
+<%static:css group='style-course'/> 
+   
+  <script type="text/javascript" src="${static.url('js/vendor/underscore-min.js')}"></script>
+  <script type="text/javascript" src="${static.url('js/vendor/backbone-min.js')}"></script>  
+  <script type="text/javascript" src="${static.url('js/vendor/jquery.tinyscrollbar.js')}"></script> 
+  % for template_name in ["badgeinstance_scrollbar", "badgeinstance_badgelet"]:
+  <script type="text/template" id="${template_name}-tpl">
+    <%static:include path="js/badgeinstances/${template_name}.underscore" />
+  </script>
+  % endfor  
+  <script language="JavaScript" type="text/javascript">
+    var student_badgeinstances = ${ badgeinstances };
+  </script> 
+  <%static:js group='courseware_dash'/>
 </%block>
 
 <%namespace name="progress_graph" file="/courseware/progress_graph.js"/>
@@ -76,17 +89,29 @@ from django.conf import settings
           <h2>Badges Earned</h2>
           <div class="sections">
             <div class="ui-badges" id="badges"> 
-               <div class="badges_scrollbar">
-               &nbsp;&nbsp;&nbsp;&nbsp;
+               <div class="badges_scrollbar" id="student_badges_scrollbar">
+                  <div class="scrollbar">
+                    <div class="track">
+                      <div class="thumb">
+                        <div class="end">                      
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="viewport">
+                       <div class="overview">
+
+
                %for i, item in enumerate(('spam', 'ham', 'eggs', 'xlk', 'eggs', 'beef', 'other', 'not', 'only', 'meat', 'bread','pickles')):
                  %for studentbadge in studentbadges: 
                    <div class="badgelet"> 
-                       <a href="#badge-${studentbadge['badge']['slug']}" title="Creative Solution"  data-tooltip="${studentbadge['badge']['consumerDescription']}" ><img id="badge-${studentbadge['badge']['slug']}" height=100px src="${studentbadge['badge']['imageUrl']}" class="badgelet"  /></a>
-                       <p>${studentbadge['badge']['name']}</p>
-
+                       <a href="#badge-${studentbadge['badgeslug']}" title="${studentbadge['name']}"  data-tooltip="${studentbadge['consumerDescription']}" ><img id="badge-${studentbadge['badgeslug']}" height=100px src="${studentbadge['imageUrl']}" class="badgelet"  /></a>
+                       <p>${studentbadge['name']}</p>
                    </div> 
                   %endfor
                 %endfor
+                        </div>
+                  </div>
               </div>
             </div>
           </div>

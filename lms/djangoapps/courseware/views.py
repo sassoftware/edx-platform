@@ -745,8 +745,9 @@ def _progress(request, course_key, student_id):
     print("***Course Slug is: ", course.id._to_string().split("+")[2])
     print("Student email is:", student.email)
     ##print("Student badges are: ",get_student_badges("http://149.173.27.52:8080/","sas-mooc", courseslug,studentemail, 'yoursecret'))
-    studentbadges = get_student_badges("http://149.173.31.143:8080/","sas-mooc", courseslug,studentemail, 'yoursecret')['instances']
-    print("Image URL is ",studentbadges[0]['badge']['imageUrl'])
+    #studentbadges = get_student_badges("http://149.173.31.143:8080/","sas-mooc", courseslug,studentemail, 'yoursecret')['instances']
+    studentbadges = get_student_badges("http://149.173.31.143:8080/","sas-mooc", courseslug,studentemail, 'yoursecret')
+    #print("Image URL is ",studentbadges[0]['badge']['imageUrl'])
     student = User.objects.prefetch_related("groups").get(id=student.id)
 
     courseware_summary = grades.progress_summary(student, request, course)
@@ -765,6 +766,7 @@ def _progress(request, course_key, student_id):
         'staff_access': staff_access,
         'student': student,
         'studentbadges': studentbadges,
+        'badgeinstances': json.dumps(studentbadges),
         'reverifications': fetch_reverify_banner_info(request, course_key)
     }
 
@@ -777,7 +779,18 @@ def get_student_badges(host, issuer, program, email, secret):
     print("!!! Now to connect to badgekit  - ", host, secret,issuer,program,email)
     a = api.BadgeKitAPI(host, secret)
     badges = a.get(system='badgekit',issuer=issuer,program=program,instance=email)
-    return badges
+    badgeinstances = [] 
+    for badge in badges['instances']: 
+        badgeinstances.append(
+                {"badgeslug": badge['badge']['slug'], 
+                    "consumerDescription": badge['badge']['consumerDescription'],
+                    "imageUrl": badge['badge']['imageUrl'],
+                    "name": badge['badge']['name'],
+                }
+            )
+    print ("BadgeInstances are ", badgeinstances)
+    #return badges
+    return badgeinstances
 
 
 def fetch_reverify_banner_info(request, course_key):
